@@ -77,12 +77,14 @@
             }
 
             navigator.geolocation.getCurrentPosition((position) => {
-                const dist = calculateDistance(
-                    position.coords.latitude, 
-                    position.coords.longitude, 
-                    classData.lat, 
-                    classData.lng
-                );
+    const userLat = position.coords.latitude;
+    const userLng = position.coords.longitude;
+    
+    // ADD THIS LINE BELOW:
+    document.getElementById('status').innerText = `Your Location: ${userLat.toFixed(4)}, ${userLng.toFixed(4)}`;
+
+    const dist = calculateDistance(userLat, userLng, classData.lat, classData.lng);
+    // 
 
                 if (dist <= classData.radius) {
                     document.getElementById('status').innerText = "Location Verified ✅";
