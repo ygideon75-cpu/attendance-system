@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+	<title></title>
+	<meta name="generator" content="LibreOffice 25.2.4.1 (Windows)"/>
+	<meta name="created" content="2026-04-11T22:21:43.897332400"/>
+	<meta name="changed" content="2026-04-11T22:21:52.158046400"/>
+</head>
+<body lang="en-US" dir="ltr"><p>&lt;!DOCTYPE html&gt;</p>
+<p>&lt;html lang=&quot;en&quot;&gt;</p>
+<p>&lt;head&gt;</p>
+<p>    &lt;meta charset=&quot;UTF-8&quot;&gt;</p>
+<p>    &lt;meta name=&quot;viewport&quot;
+content=&quot;width=device-width, initial-scale=1.0&quot;&gt;</p>
+<p>    &lt;title&gt;Class Attendance&lt;/title&gt;</p>
+<p>    &lt;style&gt;</p>
+<p>        body { font-family: sans-serif; display: flex;
+flex-direction: column; align-items: center; justify-content: center;
+height: 100vh; margin: 0; background: #f4f4f9; }</p>
+<p>        .card { background: white; padding: 2rem; border-radius:
+10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center;
+width: 90%; max-width: 400px; }</p>
+<p>        button { background: #007bff; color: white; border: none;
+padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size:
+1rem; margin-top: 10px; }</p>
+<p>        button:disabled { background: #ccc; }</p>
+<p>        #status { margin-top: 15px; font-weight: bold; }</p>
+<p>    &lt;/style&gt;</p>
+<p>&lt;/head&gt;</p>
+<p>&lt;body&gt;</p>
+<p><br/>
+<br/>
+
+</p>
+<p>    &lt;div class=&quot;card&quot;&gt;</p>
+<p>        &lt;h2 id=&quot;className&quot;&gt;Loading class...&lt;/h2&gt;</p>
+<p>        &lt;input type=&quot;text&quot; id=&quot;studentName&quot;
+placeholder=&quot;Enter Your Full Name&quot;&gt;</p>
+<p>        &lt;div id=&quot;status&quot;&gt;Detecting
+location...&lt;/div&gt;</p>
+<p>        &lt;button id=&quot;submitBtn&quot; disabled
+onclick=&quot;submitAttendance()&quot;&gt;Mark Present&lt;/button&gt;</p>
+<p>    &lt;/div&gt;</p>
+<p><br/>
+<br/>
+
+</p>
+<p>    &lt;!-- Firebase SDKs --&gt;</p>
+<p>    &lt;script type=&quot;module&quot;&gt;</p>
+<p>        import { initializeApp } from
+&quot;https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js&quot;;</p>
+<p>        import { getFirestore, doc, getDoc, addDoc, collection,
+serverTimestamp } from
+&quot;https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js&quot;;</p>
+<p><br/>
+<br/>
+
+</p>
+<p>        // 1. REPLACE THIS WITH YOUR CONFIG FROM PHASE 1</p>
+<p>        const firebaseConfig = {</p>
+<p>            apiKey: &quot;YOUR_API_KEY&quot;,</p>
+<p>            authDomain: &quot;YOUR_AUTH_DOMAIN&quot;,</p>
+<p>            projectId: &quot;YOUR_PROJECT_ID&quot;,</p>
+<p>            storageBucket: &quot;YOUR_STORAGE_BUCKET&quot;,</p>
+<p>            messagingSenderId: &quot;YOUR_MESSAGING_SENDER_ID&quot;,</p>
+<p>            appId: &quot;YOUR_APP_ID&quot;</p>
+<p>        };</p>
+<p><br/>
+<br/>
+
+</p>
+<p>        const app = initializeApp(firebaseConfig);</p>
+<p>        const db = getFirestore(app);</p>
+<p><br/>
+<br/>
+
+</p>
+<p>        // 2. Logic to get Class ID from URL (e.g.,
+index.html?class=CS101)</p>
+<p>        const urlParams = new
+URLSearchParams(window.location.search);</p>
+<p>        const classId = urlParams.get('class') || &quot;CS101&quot;;
+</p>
+<p><br/>
+<br/>
+
+</p>
+<p>        let classData = null;</p>
+<p><br/>
+<br/>
+
+</p>
+<p>        // 3. Haversine Formula to calculate distance in meters</p>
+<p>        function calculateDistance(lat1, lon1, lat2, lon2) {</p>
+<p>            const R = 6371e3; 
+</p>
+<p>            const dLat = (lat2 - lat1) * Math.PI / 180;</p>
+<p>            const dLon = (lon2 - lon1) * Math.PI / 180;</p>
+<p>            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +</p>
+<p>                      Math.cos(lat1 * Math.PI / 180) *
+Math.cos(lat2 * Math.PI / 180) *</p>
+<p>                      Math.sin(dLon/2) * Math.sin(dLon/2);</p>
+<p>            return R * 2 * Math.atan2(Math.sqrt(a),
+Math.sqrt(1-a));</p>
+<p>        }</p>
+<p><br/>
+<br/>
+
+</p>
+<p>        // 4. Fetch Class Info and Verify Location</p>
+<p>        async function init() {</p>
+<p>            const docRef = doc(db, &quot;classes&quot;, classId);</p>
+<p>            const docSnap = await getDoc(docRef);</p>
+<p><br/>
+<br/>
+
+</p>
+<p>            if (docSnap.exists()) {</p>
+<p>                classData = docSnap.data();</p>
+<p>                document.getElementById('className').innerText =
+classData.name;</p>
+<p>                checkLocation();</p>
+<p>            } else {</p>
+<p>                document.getElementById('status').innerText =
+&quot;Invalid Class QR Code.&quot;;</p>
+<p>            }</p>
+<p>        }</p>
+<p><br/>
+<br/>
+
+</p>
+<p>        function checkLocation() {</p>
+<p>            if (!navigator.geolocation) {</p>
+<p>                document.getElementById('status').innerText =
+&quot;Geolocation not supported.&quot;;</p>
+<p>                return;</p>
+<p>            }</p>
+<p><br/>
+<br/>
+
+</p>
+<p>            navigator.geolocation.getCurrentPosition((position) =&gt;
+{</p>
+<p>                const dist = calculateDistance(</p>
+<p>                    position.coords.latitude, 
+</p>
+<p>                    position.coords.longitude, 
+</p>
+<p>                    classData.lat, 
+</p>
+<p>                    classData.lng</p>
+<p>                );</p>
+<p><br/>
+<br/>
+
+</p>
+<p>                if (dist &lt;= classData.radius) {</p>
+<p>                    document.getElementById('status').innerText =
+&quot;Location Verified ✅&quot;;</p>
+<p>                    document.getElementById('status').style.color
+= &quot;green&quot;;</p>
+<p>                    document.getElementById('submitBtn').disabled
+= false;</p>
+<p>                } else {</p>
+<p>                    document.getElementById('status').innerText =
+`Too far away! (${Math.round(dist)}m away)`;</p>
+<p>                    document.getElementById('status').style.color
+= &quot;red&quot;;</p>
+<p>                }</p>
+<p>            }, (error) =&gt; {</p>
+<p>                document.getElementById('status').innerText =
+&quot;Please enable GPS/Location.&quot;;</p>
+<p>            });</p>
+<p>        }</p>
+<p><br/>
+<br/>
+
+</p>
+<p>        // 5. Submit to Firestore</p>
+<p>        window.submitAttendance = async () =&gt; {</p>
+<p>            const name =
+document.getElementById('studentName').value;</p>
+<p>            if(!name) return alert(&quot;Enter your name&quot;);</p>
+<p><br/>
+<br/>
+
+</p>
+<p>            await addDoc(collection(db, &quot;attendance&quot;), {</p>
+<p>                student: name,</p>
+<p>                classId: classId,</p>
+<p>                timestamp: serverTimestamp()</p>
+<p>            });</p>
+<p><br/>
+<br/>
+
+</p>
+<p>            alert(&quot;Attendance Marked Successfully!&quot;);</p>
+<p>            document.getElementById('submitBtn').disabled = true;</p>
+<p>        };</p>
+<p><br/>
+<br/>
+
+</p>
+<p>        init();</p>
+<p>    &lt;/script&gt;</p>
+<p>&lt;/body&gt;</p>
+<p>&lt;/html&gt;</p>
+</body>
+</html>
