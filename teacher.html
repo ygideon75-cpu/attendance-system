@@ -4,74 +4,60 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Teacher Dashboard</title>
-    <!-- Library to generate QR Codes -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; display: flex; flex-direction: column; min-height: 100vh; }
-        header { background: #1a73e8; color: white; padding: 20px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .container { display: flex; flex-wrap: wrap; padding: 20px; gap: 20px; justify-content: center; }
-        
-        /* Left Side: Controls */
+        header { background: #1a73e8; color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .container { display: flex; flex-wrap: wrap; padding: 20px; gap: 20px; }
         .panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); width: 300px; }
+        .list-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); flex-grow: 1; }
         #qrcode { margin: 20px auto; padding: 10px; background: white; border: 1px solid #ddd; width: 180px; height: 180px; }
-        
-        /* Right Side: Table */
-        .list-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); flex-grow: 1; min-width: 350px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #f8f9fa; color: #555; }
-        
+        th { background: #f8f9fa; }
         button { width: 100%; background: #1a73e8; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; }
-        button:hover { background: #1557b0; }
-        .loc-btn { background: #34a853; }
         input { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
-        .stats { font-size: 24px; font-weight: bold; color: #1a73e8; margin-bottom: 10px; }
+        .live-dot { height: 10px; width: 10px; background-color: #34a853; border-radius: 50%; display: inline-block; margin-right: 5px; animation: blink 2s infinite; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
 <header>
-    <h1>Teacher Attendance Dashboard</h1>
+    <h1>Attendance Dashboard</h1>
+    <div><span class="live-dot"></span> Live Connection</div>
 </header>
 
 <div class="container">
-    <!-- Sidebar -->
     <div class="panel">
-        <h3>Class Control</h3>
+        <h3>QR Generator</h3>
         <label>Class ID:</label>
         <input type="text" id="classIdInput" value="cs101">
-        <button onclick="generateNewQR()">Update QR Code</button>
-        
+        <button onclick="generateQR()">Update QR Code</button>
         <div id="qrcode"></div>
-        <p style="font-size: 12px; color: #666; text-align: center;">Scan to mark present</p>
-        
         <hr>
-        <h3>Location Control</h3>
-        <button class="loc-btn" onclick="updateClassLocation()">Set Class Location Here</button>
-        <p id="locStatus" style="font-size: 11px; color: #666; margin-top: 5px;"></p>
+        <button style="background:#34a853;" onclick="updateLocation()">Set Class Location Here</button>
+        <p id="locStatus" style="font-size: 11px; color: #666; margin-top: 10px;"></p>
     </div>
 
-    <!-- Attendance List -->
     <div class="list-container">
-        <div class="stats">Present: <span id="count">0</span></div>
+        <h3>Students Present: <span id="count">0</span></h3>
         <table>
             <thead>
                 <tr>
                     <th>Time</th>
                     <th>Name</th>
-                    <th>Index</th>
+                    <th>Index Number</th>
                 </tr>
             </thead>
-            <tbody id="attendanceList">
-                <tr><td colspan="3">Loading attendance...</td></tr>
-            </tbody>
+            <tbody id="attendanceList"></tbody>
         </table>
     </div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, query, where, orderBy, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyC6TqpzjJNSJ5d2CCJl7WL4RrmyIvTk8DA",
@@ -84,76 +70,41 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-
     let qrcode = new QRCode(document.getElementById("qrcode"), { width: 180, height: 180 });
 
-    // 1. Function to generate the QR code
-    window.generateNewQR = () => {
-        const classId = document.getElementById('classIdInput').value;
-        const studentUrl = `https://ygideon75-cpu.github.io/attendance-system/?class=${classId}`;
-        qrcode.makeCode(studentUrl);
-        startListening(classId);
+    window.generateQR = () => {
+        const cid = document.getElementById('classIdInput').value;
+        const url = `https://ygideon75-cpu.github.io/attendance-system/?class=${cid}`;
+        qrcode.makeCode(url);
+        listenForAttendance(cid);
     };
 
-    // 2. Function to listen for student check-ins
-    let unsubscribe = null;
-    function startListening(classId) {
-        if (unsubscribe) unsubscribe(); // Stop listening to old class if changed
-
-        const q = query(
-            collection(db, "attendance"), 
-            where("classId", "==", classId),
-            orderBy("timestamp", "desc")
-        );
-
-        unsubscribe = onSnapshot(q, (snapshot) => {
-            const list = document.getElementById('attendanceList');
-            document.getElementById('count').innerText = snapshot.size;
-            list.innerHTML = "";
-            
-            snapshot.forEach((doc) => {
+    let unsub = null;
+    function listenForAttendance(cid) {
+        if(unsub) unsub();
+        const q = query(collection(db, "attendance"), where("classId", "==", cid));
+        unsub = onSnapshot(q, (snap) => {
+            document.getElementById('count').innerText = snap.size;
+            document.getElementById('attendanceList').innerHTML = snap.docs.map(doc => {
                 const d = doc.data();
                 const time = d.timestamp ? d.timestamp.toDate().toLocaleTimeString() : "...";
-                list.innerHTML += `<tr>
-                    <td>${time}</td>
-                    <td>${d.student}</td>
-                    <td>${d.index}</td>
-                </tr>`;
-            });
-        }, (err) => {
-            console.error(err);
-            if(err.message.includes("index")) {
-                alert("Firebase needs an index. Check the browser console (F12) for the link to fix this.");
-            }
+                return `<tr><td>${time}</td><td>${d.student}</td><td>${d.index}</td></tr>`;
+            }).join('');
         });
     }
 
-    // 3. Function to update class location to where the teacher is currently standing
-    window.updateClassLocation = () => {
-        const classId = document.getElementById('classIdInput').value;
-        document.getElementById('locStatus').innerText = "Getting GPS...";
-
+    window.updateLocation = () => {
+        const cid = document.getElementById('classIdInput').value;
         navigator.geolocation.getCurrentPosition(async (pos) => {
-            const lat = pos.coords.latitude;
-            const lng = pos.coords.longitude;
-
-            try {
-                await updateDoc(doc(db, "classes", classId), {
-                    lat: lat,
-                    lng: lng,
-                    radius: 100 // Default 100 meters
-                });
-                document.getElementById('locStatus').innerText = "Location Updated Successfully!";
-                document.getElementById('locStatus').style.color = "green";
-            } catch (e) {
-                alert("Error: " + e.message);
-            }
+            await updateDoc(doc(db, "classes", cid), {
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude
+            });
+            document.getElementById('locStatus').innerText = "Location updated to your current position!";
         });
     };
 
-    // Start with default class
-    generateNewQR();
+    generateQR();
 </script>
-
 </body>
 </html>
