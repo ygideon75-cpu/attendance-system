@@ -1,88 +1,65 @@
-<!-- ... (Keep the same CSS as before) ... -->
-<div class="card">
-    <h2 id="className">Loading class...</h2>
-    
-    <!-- This section shows only if student is NOT remembered -->
-    <div id="registrationForm">
-        <input type="text" id="studentName" placeholder="Full Name">
-        <input type="text" id="studentIndex" placeholder="Index Number">
-    </div>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teacher Dashboard</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
+        table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+        th { background: #1a73e8; color: white; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <h1>Class Attendance List</h1>
+    <p>Real-time updates from students.</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Name</th>
+                <th>Index Number</th>
+                <th>Class ID</th>
+            </tr>
+        </thead>
+        <tbody id="list"></tbody>
+    </table>
 
-    <!-- This section shows if student IS remembered -->
-    <div id="welcomeBack" style="display:none;">
-        <p>Welcome back, <br><strong id="displayName"></strong></p>
-        <button onclick="clearIdentity()" style="background:#dc3545; padding:5px; font-size:12px; width:auto;">Not you?</button>
-    </div>
-    
-    <div id="status">Waiting for location...</div>
-    <button id="submitBtn" disabled onclick="submitAttendance()">Mark Present</button>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    <div class="debug-box">
-        Your Lat: <span id="myLat">0</span> | Your Lng: <span id="myLng">0</span><br>
-        Dist: <span id="myDist">0</span>m
-    </div>
-</div>
+        const firebaseConfig = {
+            apiKey: "AIzaSyC6TqpzjJNSJ5d2CCJl7WL4RrmyIvTk8DA",
+            authDomain: "qr-code-attendace.firebaseapp.com",
+            projectId: "qr-code-attendace",
+            storageBucket: "qr-code-attendace.firebasestorage.app",
+            messagingSenderId: "346712215800",
+            appId: "1:346712215800:web:0e2127df0ee4e2049c6b0d"
+        };
 
-<script type="module">
-    // firebaseConfig = {
-  apiKey: "AIzaSyC6TqpzjJNSJ5d2CCJl7WL4RrmyIvTk8DA",
-  authDomain: "qr-code-attendace.firebaseapp.com",
-  projectId: "qr-code-attendace",
-  storageBucket: "qr-code-attendace.firebasestorage.app",
-  messagingSenderId: "346712215800",
-  appId: "1:346712215800:web:0e2127df0ee4e2049c6b0d"
-};.
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
-    const nameInput = document.getElementById('studentName');
-    const indexInput = document.getElementById('studentIndex');
-    const welcomeDiv = document.getElementById('welcomeBack');
-    const formDiv = document.getElementById('registrationForm');
-    const displaySpan = document.getElementById('displayName');
-
-    // CHECK IF STUDENT IS REMEMBERED
-    function checkIdentity() {
-        const savedName = localStorage.getItem('studentName');
-        const savedIndex = localStorage.getItem('studentIndex');
-
-        if (savedName && savedIndex) {
-            formDiv.style.display = 'none';
-            welcomeDiv.style.display = 'block';
-            displaySpan.innerText = savedName + " (" + savedIndex + ")";
-            nameInput.value = savedName;
-            indexInput.value = savedIndex;
-        }
-    }
-
-    window.clearIdentity = () => {
-        localStorage.clear();
-        location.reload();
-    };
-
-    // Update submitAttendance to save identity
-    window.submitAttendance = async () => {
-        const name = nameInput.value;
-        const index = indexInput.value;
-        if(!name || !index) return alert("Please enter Name and Index");
-
-        try {
-            await addDoc(collection(db, "attendance"), {
-                student: name,
-                indexNumber: index,
-                classId: classId,
-                timestamp: serverTimestamp()
-            });
-
-            // SAVE TO PHONE MEMORY
-            localStorage.setItem('studentName', name);
-            localStorage.setItem('studentIndex', index);
-
-            alert("Success! Attendance marked.");
-            document.getElementById('submitBtn').disabled = true;
-        } catch (e) {
-            alert("Error: " + e.message);
-        }
-    };
-
-    checkIdentity();
-    init(); // Run the location logic
-</script>
+        // Listen for all attendance records sorted by time
+        const q = query(collection(db, "attendance"), orderBy("timestamp", "desc"));
+        
+        onSnapshot(q, (snap) => {
+            const listBody = document.getElementById('list');
+            listBody.innerHTML = snap.docs.map(doc => {
+                const d = doc.data();
+                const time = d.timestamp ? d.timestamp.toDate().toLocaleTimeString() : "Loading...";
+                return `<tr>
+                    <td>${time}</td>
+                    <td>${d.student}</td>
+                    <td>${d.index}</td>
+                    <td>${d.classId}</td>
+                </tr>`;
+            }).join('');
+        }, (error) => {
+            console.error("Error fetching attendance: ", error);
+            alert("Note: You may need to create a Firestore Index. Check browser console for link.");
+        });
+    </script>
+</body>
+</html>
