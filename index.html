@@ -1,120 +1,81 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Class Attendance</title>
-    <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f4f4f9; }
-        .card { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; width: 90%; max-width: 400px; }
-        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 1rem; margin-top: 10px; }
-        button:disabled { background: #ccc; }
-        #status { margin-top: 15px; font-weight: bold; }
-    </style>
-</head>
-<body>
-
-    <div class="card">
-        <h2 id="className">Loading class...</h2>
-        <input type="text" id="studentName" placeholder="Enter Your Full Name">
-        <div id="status">Detecting location...</div>
-        <button id="submitBtn" disabled onclick="submitAttendance()">Mark Present</button>
+<!-- ... (Keep the same CSS as before) ... -->
+<div class="card">
+    <h2 id="className">Loading class...</h2>
+    
+    <!-- This section shows only if student is NOT remembered -->
+    <div id="registrationForm">
+        <input type="text" id="studentName" placeholder="Full Name">
+        <input type="text" id="studentIndex" placeholder="Index Number">
     </div>
 
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, doc, getDoc, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-        // 1. REPLACE THIS WITH YOUR CONFIG FROM PHASE 1
-        const firebaseConfig = {          
-  apiKey: "AIzaSyC6TqpzjJNSJ5d2CCJl7WL4RrmyIvTk8DA",
-  authDomain: "qr-code-attendace.firebaseapp.com",
-  projectId: "qr-code-attendace",
-  storageBucket: "qr-code-attendace.firebasestorage.app",
-  messagingSenderId: "346712215800",
-  appId: "1:346712215800:web:0e2127df0ee4e2049c6b0d"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        // 2. Logic to get Class ID from URL (e.g., index.html?class=CS101)
-        const urlParams = new URLSearchParams(window.location.search);
-        const classId = urlParams.get('class') || "CS101"; 
-
-        let classData = null;
-
-        // 3. Haversine Formula to calculate distance in meters
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3; 
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
-
-        // 4. Fetch Class Info and Verify Location
-        async function init() {
-            const docRef = doc(db, "classes", classId);
-            const docSnap = await getDoc(docRef);
-
-            if (docSnap.exists()) {
-                classData = docSnap.data();
-                document.getElementById('className').innerText = classData.name;
-                checkLocation();
-            } else {
-                document.getElementById('status').innerText = "Invalid Class QR Code.";
-            }
-        }
-
-        function checkLocation() {
-            if (!navigator.geolocation) {
-                document.getElementById('status').innerText = "Geolocation not supported.";
-                return;
-            }
-
-            navigator.geolocation.getCurrentPosition((position) => {
-    const userLat = position.coords.latitude;
-    const userLng = position.coords.longitude;
+    <!-- This section shows if student IS remembered -->
+    <div id="welcomeBack" style="display:none;">
+        <p>Welcome back, <br><strong id="displayName"></strong></p>
+        <button onclick="clearIdentity()" style="background:#dc3545; padding:5px; font-size:12px; width:auto;">Not you?</button>
+    </div>
     
-    // ADD THIS LINE BELOW:
-    document.getElementById('status').innerText = `Your Location: ${userLat.toFixed(4)}, ${userLng.toFixed(4)}`;
+    <div id="status">Waiting for location...</div>
+    <button id="submitBtn" disabled onclick="submitAttendance()">Mark Present</button>
 
-    const dist = calculateDistance(userLat, userLng, classData.lat, classData.lng);
-    // 
+    <div class="debug-box">
+        Your Lat: <span id="myLat">0</span> | Your Lng: <span id="myLng">0</span><br>
+        Dist: <span id="myDist">0</span>m
+    </div>
+</div>
 
-                if (dist <= classData.radius) {
-                    document.getElementById('status').innerText = "Location Verified ✅";
-                    document.getElementById('status').style.color = "green";
-                    document.getElementById('submitBtn').disabled = false;
-                } else {
-                    document.getElementById('status').innerText = `Too far away! (${Math.round(dist)}m away)`;
-                    document.getElementById('status').style.color = "red";
-                }
-            }, (error) => {
-                document.getElementById('status').innerText = "Please enable GPS/Location.";
-            });
+<script type="module">
+    // ... (Keep Firebase Imports and Config) ...
+
+    const nameInput = document.getElementById('studentName');
+    const indexInput = document.getElementById('studentIndex');
+    const welcomeDiv = document.getElementById('welcomeBack');
+    const formDiv = document.getElementById('registrationForm');
+    const displaySpan = document.getElementById('displayName');
+
+    // CHECK IF STUDENT IS REMEMBERED
+    function checkIdentity() {
+        const savedName = localStorage.getItem('studentName');
+        const savedIndex = localStorage.getItem('studentIndex');
+
+        if (savedName && savedIndex) {
+            formDiv.style.display = 'none';
+            welcomeDiv.style.display = 'block';
+            displaySpan.innerText = savedName + " (" + savedIndex + ")";
+            nameInput.value = savedName;
+            indexInput.value = savedIndex;
         }
+    }
 
-        // 5. Submit to Firestore
-        window.submitAttendance = async () => {
-            const name = document.getElementById('studentName').value;
-            if(!name) return alert("Enter your name");
+    window.clearIdentity = () => {
+        localStorage.clear();
+        location.reload();
+    };
 
+    // Update submitAttendance to save identity
+    window.submitAttendance = async () => {
+        const name = nameInput.value;
+        const index = indexInput.value;
+        if(!name || !index) return alert("Please enter Name and Index");
+
+        try {
             await addDoc(collection(db, "attendance"), {
                 student: name,
+                indexNumber: index,
                 classId: classId,
                 timestamp: serverTimestamp()
             });
 
-            alert("Attendance Marked Successfully!");
-            document.getElementById('submitBtn').disabled = true;
-        };
+            // SAVE TO PHONE MEMORY
+            localStorage.setItem('studentName', name);
+            localStorage.setItem('studentIndex', index);
 
-        init();
-    </script>
-</body>
-</html>
+            alert("Success! Attendance marked.");
+            document.getElementById('submitBtn').disabled = true;
+        } catch (e) {
+            alert("Error: " + e.message);
+        }
+    };
+
+    checkIdentity();
+    init(); // Run the location logic
+</script>
