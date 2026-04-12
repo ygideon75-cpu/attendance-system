@@ -3,55 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teacher Dashboard</title>
+    <title>Semester Attendance Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; display: flex; flex-direction: column; min-height: 100vh; }
-        header { background: #1a73e8; color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        header { background: #1a73e8; color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; }
         .container { display: flex; flex-wrap: wrap; padding: 20px; gap: 20px; }
         .panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); width: 300px; }
         .list-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); flex-grow: 1; }
+        
+        /* Filter Section */
+        .filter-box { background: #e8f0fe; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+        .filter-group { display: flex; flex-direction: column; }
+        .filter-group label { font-size: 12px; font-weight: bold; margin-bottom: 5px; }
+        
         #qrcode { margin: 20px auto; padding: 10px; background: white; border: 1px solid #ddd; width: 180px; height: 180px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #f8f9fa; }
-        button { width: 100%; background: #1a73e8; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; }
-        input { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
-        .live-dot { height: 10px; width: 10px; background-color: #34a853; border-radius: 50%; display: inline-block; margin-right: 5px; animation: blink 2s infinite; }
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
+        th { background: #f8f9fa; position: sticky; top: 0; }
+        
+        button { background: #1a73e8; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .download-btn { background: #34a853; width: 100%; margin-top: 20px; padding: 15px; }
+        input { padding: 8px; border: 1px solid #ddd; border-radius: 6px; }
     </style>
 </head>
 <body>
 
 <header>
-    <h1>Attendance Dashboard</h1>
-    <div><span class="live-dot"></span> Live Connection</div>
+    <h1>Semester Attendance Dashboard</h1>
+    <div id="liveStatus">Connected to Firebase</div>
 </header>
 
 <div class="container">
+    <!-- Left Sidebar -->
     <div class="panel">
-        <h3>QR Generator</h3>
-        <label>Class ID:</label>
-        <input type="text" id="classIdInput" value="cs101">
-        <button onclick="generateQR()">Update QR Code</button>
+        <h3>QR Code</h3>
+        <input type="text" id="classIdInput" value="cs101" onchange="generateQR()">
         <div id="qrcode"></div>
+        <p style="font-size: 11px; text-align: center;">Scan to mark attendance</p>
+        
         <hr>
-        <button style="background:#34a853;" onclick="updateLocation()">Set Class Location Here</button>
-        <p id="locStatus" style="font-size: 11px; color: #666; margin-top: 10px;"></p>
+        <button style="background:#6c757d; width: 100%;" onclick="updateLocation()">Update Class Location</button>
+        <button class="download-btn" onclick="downloadSheet()">📊 Download Filtered List</button>
     </div>
 
+    <!-- Main Content -->
     <div class="list-container">
-        <h3>Students Present: <span id="count">0</span></h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Name</th>
-                    <th>Index Number</th>
-                </tr>
-            </thead>
-            <tbody id="attendanceList"></tbody>
-        </table>
+        <div class="filter-box">
+            <div class="filter-group">
+                <label>From Date:</label>
+                <input type="date" id="startDate">
+            </div>
+            <div class="filter-group">
+                <label>To Date:</label>
+                <input type="date" id="endDate">
+            </div>
+            <button onclick="applyFilters()">Apply Filter</button>
+            <button style="background:#6c757d;" onclick="resetFilters()">Show All</button>
+        </div>
+
+        <h3>Records Found: <span id="count">0</span></h3>
+        <div style="max-height: 600px; overflow-y: auto;">
+            <table id="attendanceTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Student Name</th>
+                        <th>Index Number</th>
+                    </tr>
+                </thead>
+                <tbody id="attendanceList"></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -71,27 +95,86 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     let qrcode = new QRCode(document.getElementById("qrcode"), { width: 180, height: 180 });
+    let allData = [];
 
+    // 1. Generate QR
     window.generateQR = () => {
         const cid = document.getElementById('classIdInput').value;
         const url = `https://ygideon75-cpu.github.io/attendance-system/?class=${cid}`;
         qrcode.makeCode(url);
-        listenForAttendance(cid);
+        fetchData(cid);
     };
 
-    let unsub = null;
-    function listenForAttendance(cid) {
-        if(unsub) unsub();
+    // 2. Fetch Data (Real-time)
+    function fetchData(cid) {
         const q = query(collection(db, "attendance"), where("classId", "==", cid));
-        unsub = onSnapshot(q, (snap) => {
-            document.getElementById('count').innerText = snap.size;
-            document.getElementById('attendanceList').innerHTML = snap.docs.map(doc => {
-                const d = doc.data();
-                const time = d.timestamp ? d.timestamp.toDate().toLocaleTimeString() : "...";
-                return `<tr><td>${time}</td><td>${d.student}</td><td>${d.index}</td></tr>`;
-            }).join('');
+        
+        onSnapshot(q, (snap) => {
+            allData = snap.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                dateObj: doc.data().timestamp ? doc.data().timestamp.toDate() : new Date()
+            }));
+            // Sort by newest first
+            allData.sort((a, b) => b.dateObj - a.dateObj);
+            renderTable(allData);
         });
     }
+
+    // 3. Render Table
+    function renderTable(data) {
+        const listBody = document.getElementById('attendanceList');
+        document.getElementById('count').innerText = data.length;
+        
+        listBody.innerHTML = data.map(d => `
+            <tr>
+                <td>${d.dateObj.toLocaleDateString()}</td>
+                <td>${d.dateObj.toLocaleTimeString()}</td>
+                <td>${d.student}</td>
+                <td>${d.index}</td>
+            </tr>
+        `).join('');
+    }
+
+    // 4. Filtering Logic
+    window.applyFilters = () => {
+        const start = new Date(document.getElementById('startDate').value);
+        const end = new Date(document.getElementById('endDate').value);
+        end.setHours(23, 59, 59); // Include the whole end day
+
+        if (isNaN(start) || isNaN(end)) return alert("Please select both dates");
+
+        const filtered = allData.filter(d => d.dateObj >= start && d.dateObj <= end);
+        renderTable(filtered);
+    };
+
+    window.resetFilters = () => {
+        document.getElementById('startDate').value = "";
+        document.getElementById('endDate').value = "";
+        renderTable(allData);
+    };
+
+    // 5. Download CSV
+    window.downloadSheet = () => {
+        const cid = document.getElementById('classIdInput').value;
+        const rows = document.querySelectorAll("#attendanceTable tr");
+        let csvContent = "data:text/csv;charset=utf-8,Date,Time,Name,Index\n";
+
+        rows.forEach((row, index) => {
+            if (index > 0) {
+                const cols = row.querySelectorAll("td");
+                const rowData = Array.from(cols).map(col => col.innerText).join(",");
+                csvContent += rowData + "\n";
+            }
+        });
+
+        const link = document.createElement("a");
+        link.setAttribute("href", encodeURI(csvContent));
+        link.setAttribute("download", `Attendance_${cid}_Semester_Report.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
     window.updateLocation = () => {
         const cid = document.getElementById('classIdInput').value;
@@ -100,7 +183,7 @@
                 lat: pos.coords.latitude,
                 lng: pos.coords.longitude
             });
-            document.getElementById('locStatus').innerText = "Location updated to your current position!";
+            alert("Location updated for this class!");
         });
     };
 
