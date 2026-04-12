@@ -5,35 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Attendance</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f0f2f5; padding: 20px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f0f2f5; padding: 20px; }
         .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); text-align: center; width: 100%; max-width: 400px; }
-        .hidden { display: none !important; }
+        h2 { color: #1a73e8; margin-bottom: 10px; }
         input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
         button { width: 100%; background: #1a73e8; color: white; border: none; padding: 15px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px; }
-        button:disabled { background: #ccc; }
-        .welcome-box { background: #e8f0fe; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #c2d7fa; color: #1967d2; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        #status { margin-top: 20px; font-weight: bold; color: #555; }
+        .success-msg { color: #28a745; font-weight: bold; margin-top: 20px; display: none; }
     </style>
 </head>
 <body>
 
-    <div class="card">
+    <div class="card" id="mainCard">
         <h2 id="className">Connecting...</h2>
+        <p>Please enter your details for today's class.</p>
         
-        <!-- Welcome Box (Hidden by default) -->
-        <div id="welcomeBox" class="hidden welcome-box">
-            Welcome back, <br><strong id="userDisplay"></strong>
-            <br><small onclick="forgetMe()" style="text-decoration:underline; cursor:pointer; color:red;">Reset Details</small>
-        </div>
-
-        <!-- Registration Form (Hidden by default) -->
-        <div id="regForm" class="hidden">
-            <p>Enter details to register</p>
-            <input type="text" id="studentName" placeholder="Full Name">
-            <input type="text" id="studentIndex" placeholder="Index Number">
-        </div>
+        <input type="text" id="studentName" placeholder="Full Name">
+        <input type="text" id="studentIndex" placeholder="Index Number">
 
         <div id="status">Detecting Location...</div>
+        
         <button id="submitBtn" disabled onclick="submitAttendance()">Mark Present</button>
+        <div id="successMsg" class="success-msg">✅ Attendance Marked Successfully!</div>
     </div>
 
     <script type="module">
@@ -56,25 +50,7 @@
         const classId = urlParams.get('class') || "cs101"; 
         let classData = null;
 
-        // --- 1. IDENTITY CHECK (RUNS IMMEDIATELY) ---
-        const savedName = localStorage.getItem('student_name');
-        const savedIndex = localStorage.getItem('student_index');
-
-        if (savedName && savedIndex) {
-            document.getElementById('welcomeBox').classList.remove('hidden');
-            document.getElementById('userDisplay').innerText = savedName;
-            document.getElementById('studentName').value = savedName;
-            document.getElementById('studentIndex').value = savedIndex;
-        } else {
-            document.getElementById('regForm').classList.remove('hidden');
-        }
-
-        window.forgetMe = () => {
-            localStorage.clear();
-            location.reload();
-        };
-
-        // --- 2. GPS & FIREBASE LOGIC ---
+        // 1. Load Class Data
         async function init() {
             try {
                 const docRef = doc(db, "classes", classId);
@@ -82,27 +58,15 @@
                 if (snap.exists()) {
                     classData = snap.data();
                     document.getElementById('className').innerText = classData.name;
-                    startGPS();
-                }
-            } catch (e) { console.error(e); }
-        }
-
-        function startGPS() {
-            navigator.geolocation.watchPosition((pos) => {
-                if(!classData) return;
-                const d = calculateDistance(pos.coords.latitude, pos.coords.longitude, classData.lat, classData.lng);
-                if (d <= classData.radius) {
-                    document.getElementById('status').innerText = "Location Verified ✅";
-                    document.getElementById('status').style.color = "green";
-                    document.getElementById('submitBtn').disabled = false;
+                    checkLocation();
                 } else {
-                    document.getElementById('status').innerText = "Too far from class!";
-                    document.getElementById('status').style.color = "red";
+                    document.getElementById('status').innerText = "Error: Class ID not found.";
                 }
-            }, null, {enableHighAccuracy: true});
+            } catch (e) { alert("Error: " + e.message); }
         }
 
-        function calculateDistance(lat1, lon1, lat2, lon2) {
+        // 2. GPS Logic
+        function getDistance(lat1, lon1, lat2, lon2) {
             const R = 6371e3;
             const dLat = (lat2-lat1) * Math.PI/180;
             const dLon = (lon2-lon1) * Math.PI/180;
@@ -110,24 +74,48 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
+        window.checkLocation = () => {
+            navigator.geolocation.watchPosition((pos) => {
+                if(!classData) return;
+                const d = getDistance(pos.coords.latitude, pos.coords.longitude, classData.lat, classData.lng);
+                if (d <= classData.radius) {
+                    document.getElementById('status').innerText = "Location Verified ✅";
+                    document.getElementById('status').style.color = "green";
+                    document.getElementById('submitBtn').disabled = false;
+                } else {
+                    document.getElementById('status').innerText = "Too far from class!";
+                    document.getElementById('status').style.color = "red";
+                    document.getElementById('submitBtn').disabled = true;
+                }
+            }, null, {enableHighAccuracy: true});
+        };
+
+        // 3. Submit Attendance
         window.submitAttendance = async () => {
             const name = document.getElementById('studentName').value;
             const index = document.getElementById('studentIndex').value;
-            if(!name || !index) return alert("Enter Name and Index");
+            if(!name || !index) return alert("Please enter Name and Index");
 
             try {
+                document.getElementById('submitBtn').disabled = true;
+                document.getElementById('submitBtn').innerText = "Saving...";
+
                 await addDoc(collection(db, "attendance"), {
                     student: name,
                     index: index,
                     classId: classId,
                     timestamp: serverTimestamp()
                 });
-                // SAVE TO MEMORY
-                localStorage.setItem('student_name', name);
-                localStorage.setItem('student_index', index);
-                alert("Attendance Marked!");
-                location.reload(); 
-            } catch (e) { alert(e.message); }
+
+                document.getElementById('submitBtn').style.display = 'none';
+                document.getElementById('status').style.display = 'none';
+                document.getElementById('successMsg').style.display = 'block';
+                alert("Success! Your attendance is recorded.");
+            } catch (e) {
+                alert("Error: " + e.message);
+                document.getElementById('submitBtn').disabled = false;
+                document.getElementById('submitBtn').innerText = "Mark Present";
+            }
         };
 
         init();
