@@ -5,29 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Attendance</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f0f2f5; padding: 20px; }
-        .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); text-align: center; width: 100%; max-width: 400px; }
+        body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f0f2f5; padding: 20px; }
+        .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 400px; }
         h2 { color: #1a73e8; margin-bottom: 10px; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
-        button { width: 100%; background: #1a73e8; color: white; border: none; padding: 15px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; background: #1a73e8; color: white; border: none; padding: 15px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; font-size: 16px; }
         button:disabled { background: #ccc; cursor: not-allowed; }
-        #status { margin-top: 20px; font-weight: bold; color: #555; }
-        .success-msg { color: #28a745; font-weight: bold; margin-top: 20px; display: none; }
+        #status { margin-top: 15px; font-weight: bold; color: #666; min-height: 20px; }
+        .success-msg { color: #28a745; font-weight: bold; margin-top: 20px; display: none; padding: 15px; background: #e6ffed; border-radius: 8px; border: 1px solid #28a745; }
     </style>
 </head>
 <body>
 
-    <div class="card" id="mainCard">
+    <div class="card">
         <h2 id="className">Connecting...</h2>
-        <p>Please enter your details for today's class.</p>
-        
-        <input type="text" id="studentName" placeholder="Full Name">
-        <input type="text" id="studentIndex" placeholder="Index Number">
-
-        <div id="status">Detecting Location...</div>
-        
-        <button id="submitBtn" disabled onclick="submitAttendance()">Mark Present</button>
-        <div id="successMsg" class="success-msg">✅ Attendance Marked Successfully!</div>
+        <div id="mainUI">
+            <p>Enter your details to mark attendance.</p>
+            <input type="text" id="studentName" placeholder="Full Name">
+            <input type="text" id="studentIndex" placeholder="Index Number">
+            <div id="status">Waiting for GPS signal...</div>
+            <button id="submitBtn" disabled onclick="submitAttendance()">Mark Present</button>
+        </div>
+        <div id="successBox" class="success-msg">✅ Attendance Marked Successfully!</div>
     </div>
 
     <script type="module">
@@ -45,12 +44,11 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-
+        
         const urlParams = new URLSearchParams(window.location.search);
         const classId = urlParams.get('class') || "cs101"; 
         let classData = null;
 
-        // 1. Load Class Data
         async function init() {
             try {
                 const docRef = doc(db, "classes", classId);
@@ -58,15 +56,55 @@
                 if (snap.exists()) {
                     classData = snap.data();
                     document.getElementById('className').innerText = classData.name;
-                    checkLocation();
+                    startGPS();
                 } else {
-                    document.getElementById('status').innerText = "Error: Class ID not found.";
+                    document.getElementById('status').innerText = "Class ID '" + classId + "' not found.";
                 }
-            } catch (e) { alert("Error: " + e.message); }
+            } catch (e) { alert("Firebase Error: " + e.message); }
         }
 
-        // 2. GPS Logic
-        function getDistance(lat1, lon1, lat2, lon2) {
+        function startGPS() {
+            if (!navigator.geolocation) {
+                document.getElementById('status').innerText = "GPS not supported on this phone.";
+                return;
+            }
+
+            // Options for faster/more accurate GPS
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            };
+
+            navigator.geolocation.watchPosition((pos) => {
+                if(!classData) return;
+                
+                const uLat = pos.coords.latitude;
+                const uLng = pos.coords.longitude;
+                const d = calculateDistance(uLat, uLng, classData.lat, classData.lng);
+                
+                if (d <= classData.radius) {
+                    document.getElementById('status').innerText = "Location Verified ✅";
+                    document.getElementById('status').style.color = "green";
+                    document.getElementById('submitBtn').disabled = false;
+                } else {
+                    document.getElementById('status').innerText = "Too far from class (" + Math.round(d) + "m)";
+                    document.getElementById('status').style.color = "red";
+                    document.getElementById('submitBtn').disabled = true;
+                }
+            }, (err) => {
+                // ERROR HANDLING
+                if (err.code === 1) {
+                    document.getElementById('status').innerText = "Error: Location Permission Denied. Please allow GPS.";
+                } else if (err.code === 2) {
+                    document.getElementById('status').innerText = "Error: GPS signal weak. Move near a window.";
+                } else {
+                    document.getElementById('status').innerText = "Error: Searching for GPS...";
+                }
+            }, options);
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 6371e3;
             const dLat = (lat2-lat1) * Math.PI/180;
             const dLon = (lon2-lon1) * Math.PI/180;
@@ -74,48 +112,23 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        window.checkLocation = () => {
-            navigator.geolocation.watchPosition((pos) => {
-                if(!classData) return;
-                const d = getDistance(pos.coords.latitude, pos.coords.longitude, classData.lat, classData.lng);
-                if (d <= classData.radius) {
-                    document.getElementById('status').innerText = "Location Verified ✅";
-                    document.getElementById('status').style.color = "green";
-                    document.getElementById('submitBtn').disabled = false;
-                } else {
-                    document.getElementById('status').innerText = "Too far from class!";
-                    document.getElementById('status').style.color = "red";
-                    document.getElementById('submitBtn').disabled = true;
-                }
-            }, null, {enableHighAccuracy: true});
-        };
-
-        // 3. Submit Attendance
         window.submitAttendance = async () => {
-            const name = document.getElementById('studentName').value;
-            const index = document.getElementById('studentIndex').value;
-            if(!name || !index) return alert("Please enter Name and Index");
+            const name = document.getElementById('studentName').value.trim();
+            const index = document.getElementById('studentIndex').value.trim();
+            if(!name || !index) return alert("Enter Name and Index");
 
             try {
                 document.getElementById('submitBtn').disabled = true;
                 document.getElementById('submitBtn').innerText = "Saving...";
-
                 await addDoc(collection(db, "attendance"), {
                     student: name,
                     index: index,
                     classId: classId,
                     timestamp: serverTimestamp()
                 });
-
-                document.getElementById('submitBtn').style.display = 'none';
-                document.getElementById('status').style.display = 'none';
-                document.getElementById('successMsg').style.display = 'block';
-                alert("Success! Your attendance is recorded.");
-            } catch (e) {
-                alert("Error: " + e.message);
-                document.getElementById('submitBtn').disabled = false;
-                document.getElementById('submitBtn').innerText = "Mark Present";
-            }
+                document.getElementById('mainUI').style.display = 'none';
+                document.getElementById('successBox').style.display = 'block';
+            } catch (e) { alert("Error: " + e.message); }
         };
 
         init();
