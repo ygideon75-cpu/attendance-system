@@ -4,32 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Attendance</title>
+    <!-- FingerprintJS: Identifies the device hardware -->
+    <script src="https://openfpcdn.io/fingerprintjs/v4/i.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f0f2f5; padding: 20px; }
+        body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f0f2f5; padding: 20px; }
         .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); text-align: center; width: 100%; max-width: 400px; }
-        h2 { color: #1a73e8; margin-bottom: 10px; }
         input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
         button { width: 100%; background: #1a73e8; color: white; border: none; padding: 15px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        .msg { font-weight: bold; margin-top: 20px; padding: 15px; border-radius: 8px; display: none; line-height: 1.4; }
+        button:disabled { background: #ccc; }
+        .msg { font-weight: bold; margin-top: 20px; padding: 15px; border-radius: 8px; display: none; }
         .error { background: #ffeef0; color: #d73a49; border: 1px solid #d73a49; }
         .success { background: #e6ffed; color: #28a745; border: 1px solid #28a745; }
-        #status { margin-top: 15px; font-size: 14px; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div class="card">
         <h2 id="className">Connecting...</h2>
-        
         <div id="mainUI">
-            <p id="instruction">Please enter your details.</p>
             <input type="text" id="studentName" placeholder="Full Name">
             <input type="text" id="studentIndex" placeholder="Index Number">
-            <div id="status">Detecting Location...</div>
+            <div id="status" style="margin-top:10px; font-weight:bold;">Initializing...</div>
             <button id="submitBtn" disabled onclick="submitAttendance()">Mark Present</button>
         </div>
-
         <div id="responseMsg" class="msg"></div>
     </div>
 
@@ -46,129 +43,4 @@
             appId: "1:346712215800:web:0e2127df0ee4e2049c6b0d"
         };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const classId = urlParams.get('class') || "cs101"; 
-        let classData = null;
-
-        // --- 1. DEVICE LOCK CHECK ---
-        function isAlreadyMarked() {
-            const today = new Date().toDateString();
-            const savedDate = localStorage.getItem('marked_' + classId);
-            return savedDate === today;
-        }
-
-        function blockUI(message) {
-            document.getElementById('mainUI').innerHTML = ""; // Completely destroy the form
-            const msgBox = document.getElementById('responseMsg');
-            msgBox.innerText = message;
-            msgBox.className = "msg error";
-            msgBox.style.display = "block";
-        }
-
-        async function init() {
-            // Check if this device already submitted today
-            if (isAlreadyMarked()) {
-                blockUI("❌ Access Denied: This device has already submitted attendance for this class today. Proxy attendance is strictly prohibited.");
-                return;
-            }
-
-            try {
-                const docRef = doc(db, "classes", classId);
-                const snap = await getDoc(docRef);
-                if (snap.exists()) {
-                    classData = snap.data();
-                    document.getElementById('className').innerText = classData.name;
-                    startGPS();
-                }
-            } catch (e) { console.error(e); }
-        }
-
-        function startGPS() {
-            navigator.geolocation.watchPosition((pos) => {
-                if(!classData) return;
-                const d = calculateDistance(pos.coords.latitude, pos.coords.longitude, classData.lat, classData.lng);
-                if (d <= classData.radius) {
-                    document.getElementById('status').innerText = "Location Verified ✅";
-                    document.getElementById('status').style.color = "green";
-                    document.getElementById('submitBtn').disabled = false;
-                } else {
-                    document.getElementById('status').innerText = "Too far from class!";
-                    document.getElementById('status').style.color = "red";
-                    document.getElementById('submitBtn').disabled = true;
-                }
-            }, null, {enableHighAccuracy: true});
-        }
-
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3;
-            const dLat = (lat2-lat1) * Math.PI/180;
-            const dLon = (lon2-lon1) * Math.PI/180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
-
-        window.submitAttendance = async () => {
-            // Re-check device lock at time of click
-            if (isAlreadyMarked()) {
-                blockUI("❌ Device Blocked: You cannot mark attendance twice.");
-                return;
-            }
-
-            const name = document.getElementById('studentName').value;
-            const index = document.getElementById('studentIndex').value;
-            if(!name || !index) return alert("Please enter Name and Index");
-
-            document.getElementById('submitBtn').disabled = true;
-            document.getElementById('submitBtn').innerText = "Verifying...";
-
-            try {
-                // --- DATABASE CHECK ---
-                const startOfToday = new Date();
-                startOfToday.setHours(0,0,0,0);
-
-                const q = query(
-                    collection(db, "attendance"), 
-                    where("index", "==", index),
-                    where("classId", "==", classId),
-                    where("timestamp", ">=", startOfToday)
-                );
-
-                const querySnapshot = await getDocs(q);
-
-                if (!querySnapshot.empty) {
-                    alert("This Index Number has already been used today!");
-                    location.reload();
-                    return;
-                }
-
-                // --- SAVE ---
-                await addDoc(collection(db, "attendance"), {
-                    student: name,
-                    index: index,
-                    classId: classId,
-                    timestamp: serverTimestamp()
-                });
-
-                // --- LOCK DEVICE ---
-                localStorage.setItem('marked_' + classId, new Date().toDateString());
-
-                // --- SHOW SUCCESS ---
-                document.getElementById('mainUI').style.display = 'none';
-                const msgBox = document.getElementById('responseMsg');
-                msgBox.innerText = "✅ Success! Attendance recorded.";
-                msgBox.className = "msg success";
-                msgBox.style.display = "block";
-
-            } catch (e) {
-                alert("Error: " + e.message);
-                document.getElementById('submitBtn').disabled = false;
-            }
-        };
-
-        init();
-    </script>
-</body>
-</html>
+        const ap
