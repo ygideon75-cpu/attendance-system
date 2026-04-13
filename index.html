@@ -12,7 +12,7 @@
         button { width: 100%; background: #1a73e8; color: white; border: none; padding: 15px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px; }
         button:disabled { background: #ccc; cursor: not-allowed; }
         #status { margin-top: 20px; font-weight: bold; color: #555; }
-        .msg { font-weight: bold; margin-top: 20px; display: none; padding: 10px; border-radius: 8px; }
+        .msg { font-weight: bold; margin-top: 20px; padding: 15px; border-radius: 8px; display: none; line-height: 1.4; }
         .success { background: #e6ffed; color: #28a745; border: 1px solid #28a745; }
         .error { background: #ffeef0; color: #d73a49; border: 1px solid #d73a49; }
     </style>
@@ -21,9 +21,9 @@
 
     <div class="card">
         <h2 id="className">Connecting...</h2>
-        <p id="instructionText">Enter your details to mark attendance.</p>
         
-        <div id="formArea">
+        <div id="mainUI">
+            <p>Enter your details to mark attendance.</p>
             <input type="text" id="studentName" placeholder="Full Name">
             <input type="text" id="studentIndex" placeholder="Index Number">
             <div id="status">Detecting Location...</div>
@@ -53,7 +53,29 @@
         const classId = urlParams.get('class') || "cs101"; 
         let classData = null;
 
+        // --- LAYER 1: DEVICE LOCK CHECK ---
+        function checkDeviceLock() {
+            const today = new Date().toLocaleDateString();
+            const lastMarked = localStorage.getItem('last_marked_' + classId);
+            
+            if (lastMarked === today) {
+                showError("❌ Device Blocked: This phone has already submitted attendance for this class today. Proxy attendance is not allowed.");
+                document.getElementById('mainUI').style.display = 'none';
+                return true;
+            }
+            return false;
+        }
+
+        function showError(text) {
+            const msgBox = document.getElementById('responseMsg');
+            msgBox.innerText = text;
+            msgBox.className = "msg error";
+            msgBox.style.display = "block";
+        }
+
         async function init() {
+            if (checkDeviceLock()) return;
+
             try {
                 const docRef = doc(db, "classes", classId);
                 const snap = await getDoc(docRef);
@@ -61,8 +83,6 @@
                     classData = snap.data();
                     document.getElementById('className').innerText = classData.name;
                     startGPS();
-                } else {
-                    document.getElementById('status').innerText = "Error: Class ID not found.";
                 }
             } catch (e) { console.error(e); }
         }
@@ -94,15 +114,14 @@
         window.submitAttendance = async () => {
             const name = document.getElementById('studentName').value;
             const index = document.getElementById('studentIndex').value;
-            const msgBox = document.getElementById('responseMsg');
-
             if(!name || !index) return alert("Please enter Name and Index");
 
-            try {
-                document.getElementById('submitBtn').disabled = true;
-                document.getElementById('submitBtn').innerText = "Checking...";
+            // Disable button immediately to prevent double-clicks
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('submitBtn').innerText = "Verifying...";
 
-                // --- ONCE PER DAY CHECK ---
+            try {
+                // --- LAYER 2: DATABASE INDEX CHECK ---
                 const startOfToday = new Date();
                 startOfToday.setHours(0,0,0,0);
 
@@ -116,15 +135,12 @@
                 const querySnapshot = await getDocs(q);
 
                 if (!querySnapshot.empty) {
-                    // Student already marked today
-                    msgBox.innerText = "❌ Error: You have already marked attendance for this class today.";
-                    msgBox.className = "msg error";
-                    msgBox.style.display = "block";
+                    showError("❌ Error: This Index Number has already been used today.");
                     document.getElementById('submitBtn').innerText = "Mark Present";
                     return;
                 }
 
-                // --- PROCEED TO SAVE ---
+                // --- SAVE ATTENDANCE ---
                 await addDoc(collection(db, "attendance"), {
                     student: name,
                     index: index,
@@ -132,8 +148,11 @@
                     timestamp: serverTimestamp()
                 });
 
-                document.getElementById('formArea').style.display = 'none';
-                document.getElementById('instructionText').style.display = 'none';
+                // --- SET DEVICE LOCK ---
+                localStorage.setItem('last_marked_' + classId, new Date().toLocaleDateString());
+
+                document.getElementById('mainUI').style.display = 'none';
+                const msgBox = document.getElementById('responseMsg');
                 msgBox.innerText = "✅ Success! Your attendance has been recorded.";
                 msgBox.className = "msg success";
                 msgBox.style.display = "block";
