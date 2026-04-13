@@ -11,10 +11,10 @@
         input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
         button { width: 100%; background: #1a73e8; color: white; border: none; padding: 15px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px; }
         button:disabled { background: #ccc; cursor: not-allowed; }
-        #status { margin-top: 20px; font-weight: bold; color: #555; }
         .msg { font-weight: bold; margin-top: 20px; padding: 15px; border-radius: 8px; display: none; line-height: 1.4; }
-        .success { background: #e6ffed; color: #28a745; border: 1px solid #28a745; }
         .error { background: #ffeef0; color: #d73a49; border: 1px solid #d73a49; }
+        .success { background: #e6ffed; color: #28a745; border: 1px solid #28a745; }
+        #status { margin-top: 15px; font-size: 14px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -23,7 +23,7 @@
         <h2 id="className">Connecting...</h2>
         
         <div id="mainUI">
-            <p>Enter your details to mark attendance.</p>
+            <p id="instruction">Please enter your details.</p>
             <input type="text" id="studentName" placeholder="Full Name">
             <input type="text" id="studentIndex" placeholder="Index Number">
             <div id="status">Detecting Location...</div>
@@ -53,28 +53,27 @@
         const classId = urlParams.get('class') || "cs101"; 
         let classData = null;
 
-        // --- LAYER 1: DEVICE LOCK CHECK ---
-        function checkDeviceLock() {
-            const today = new Date().toLocaleDateString();
-            const lastMarked = localStorage.getItem('last_marked_' + classId);
-            
-            if (lastMarked === today) {
-                showError("❌ Device Blocked: This phone has already submitted attendance for this class today. Proxy attendance is not allowed.");
-                document.getElementById('mainUI').style.display = 'none';
-                return true;
-            }
-            return false;
+        // --- 1. DEVICE LOCK CHECK ---
+        function isAlreadyMarked() {
+            const today = new Date().toDateString();
+            const savedDate = localStorage.getItem('marked_' + classId);
+            return savedDate === today;
         }
 
-        function showError(text) {
+        function blockUI(message) {
+            document.getElementById('mainUI').innerHTML = ""; // Completely destroy the form
             const msgBox = document.getElementById('responseMsg');
-            msgBox.innerText = text;
+            msgBox.innerText = message;
             msgBox.className = "msg error";
             msgBox.style.display = "block";
         }
 
         async function init() {
-            if (checkDeviceLock()) return;
+            // Check if this device already submitted today
+            if (isAlreadyMarked()) {
+                blockUI("❌ Access Denied: This device has already submitted attendance for this class today. Proxy attendance is strictly prohibited.");
+                return;
+            }
 
             try {
                 const docRef = doc(db, "classes", classId);
@@ -112,16 +111,21 @@
         }
 
         window.submitAttendance = async () => {
+            // Re-check device lock at time of click
+            if (isAlreadyMarked()) {
+                blockUI("❌ Device Blocked: You cannot mark attendance twice.");
+                return;
+            }
+
             const name = document.getElementById('studentName').value;
             const index = document.getElementById('studentIndex').value;
             if(!name || !index) return alert("Please enter Name and Index");
 
-            // Disable button immediately to prevent double-clicks
             document.getElementById('submitBtn').disabled = true;
             document.getElementById('submitBtn').innerText = "Verifying...";
 
             try {
-                // --- LAYER 2: DATABASE INDEX CHECK ---
+                // --- DATABASE CHECK ---
                 const startOfToday = new Date();
                 startOfToday.setHours(0,0,0,0);
 
@@ -135,12 +139,12 @@
                 const querySnapshot = await getDocs(q);
 
                 if (!querySnapshot.empty) {
-                    showError("❌ Error: This Index Number has already been used today.");
-                    document.getElementById('submitBtn').innerText = "Mark Present";
+                    alert("This Index Number has already been used today!");
+                    location.reload();
                     return;
                 }
 
-                // --- SAVE ATTENDANCE ---
+                // --- SAVE ---
                 await addDoc(collection(db, "attendance"), {
                     student: name,
                     index: index,
@@ -148,19 +152,19 @@
                     timestamp: serverTimestamp()
                 });
 
-                // --- SET DEVICE LOCK ---
-                localStorage.setItem('last_marked_' + classId, new Date().toLocaleDateString());
+                // --- LOCK DEVICE ---
+                localStorage.setItem('marked_' + classId, new Date().toDateString());
 
+                // --- SHOW SUCCESS ---
                 document.getElementById('mainUI').style.display = 'none';
                 const msgBox = document.getElementById('responseMsg');
-                msgBox.innerText = "✅ Success! Your attendance has been recorded.";
+                msgBox.innerText = "✅ Success! Attendance recorded.";
                 msgBox.className = "msg success";
                 msgBox.style.display = "block";
 
             } catch (e) {
                 alert("Error: " + e.message);
                 document.getElementById('submitBtn').disabled = false;
-                document.getElementById('submitBtn').innerText = "Mark Present";
             }
         };
 
