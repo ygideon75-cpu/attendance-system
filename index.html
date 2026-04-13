@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Attendance</title>
-    <!-- FingerprintJS: Identifies the device hardware -->
     <script src="https://openfpcdn.io/fingerprintjs/v4/i.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f0f2f5; padding: 20px; }
@@ -24,7 +23,7 @@
         <div id="mainUI">
             <input type="text" id="studentName" placeholder="Full Name">
             <input type="text" id="studentIndex" placeholder="Index Number">
-            <div id="status" style="margin-top:10px; font-weight:bold;">Initializing...</div>
+            <div id="status" style="margin-top:10px; font-weight:bold;">Initializing Security...</div>
             <button id="submitBtn" disabled onclick="submitAttendance()">Mark Present</button>
         </div>
         <div id="responseMsg" class="msg"></div>
@@ -32,7 +31,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, doc, getDoc, addDoc, collection, serverTimestamp, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyC6TqpzjJNSJ5d2CCJl7WL4RrmyIvTk8DA",
@@ -43,4 +42,117 @@
             appId: "1:346712215800:web:0e2127df0ee4e2049c6b0d"
         };
 
-        const ap
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const urlParams = new URLSearchParams(window.location.search);
+        const classId = urlParams.get('class') || "cs101"; 
+        
+        let classData = null;
+        let deviceId = null;
+
+        // 1. Get Device ID
+        async function getDeviceID() {
+            const fp = await FingerprintJS.load();
+            const result = await fp.get();
+            deviceId = result.visitorId;
+            init();
+        }
+
+        async function init() {
+            try {
+                const docRef = doc(db, "classes", classId);
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    classData = snap.data();
+                    document.getElementById('className').innerText = classData.name;
+                    startGPS();
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function startGPS() {
+            navigator.geolocation.watchPosition((pos) => {
+                if(!classData) return;
+                const d = calculateDistance(pos.coords.latitude, pos.coords.longitude, classData.lat, classData.lng);
+                if (d <= classData.radius) {
+                    document.getElementById('status').innerText = "Location Verified ✅";
+                    document.getElementById('status').style.color = "green";
+                    document.getElementById('submitBtn').disabled = false;
+                } else {
+                    document.getElementById('status').innerText = "Too far from class!";
+                    document.getElementById('status').style.color = "red";
+                    document.getElementById('submitBtn').disabled = true;
+                }
+            }, null, {enableHighAccuracy: true});
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const dLat = (lat2-lat1) * Math.PI/180;
+            const dLon = (lon2-lon1) * Math.PI/180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        window.submitAttendance = async () => {
+            const name = document.getElementById('studentName').value;
+            const index = document.getElementById('studentIndex').value;
+            if(!name || !index) return alert("Enter Name and Index");
+
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('submitBtn').innerText = "Security Check...";
+
+            const today = new Date().toISOString().split('T')[0]; // e.g. 2023-10-27
+            
+            // Create unique IDs for the locks
+            const deviceLockID = `${today}_${classId}_DEV_${deviceId}`;
+            const indexLockID = `${today}_${classId}_IDX_${index}`;
+
+            try {
+                // --- CHECK LOCKS ---
+                const devSnap = await getDoc(doc(db, "locks", deviceLockID));
+                const idxSnap = await getDoc(doc(db, "locks", indexLockID));
+
+                if (devSnap.exists()) {
+                    return blockUser("❌ Device Blocked: This phone has already marked attendance today.");
+                }
+                if (idxSnap.exists()) {
+                    return blockUser("❌ Index Blocked: This Index Number has already been used today.");
+                }
+
+                // --- CREATE LOCKS & SAVE ATTENDANCE ---
+                // We use setDoc to create the locks so they exist for the next check
+                await setDoc(doc(db, "locks", deviceLockID), { used: true, timestamp: serverTimestamp() });
+                await setDoc(doc(db, "locks", indexLockID), { used: true, timestamp: serverTimestamp() });
+
+                await addDoc(collection(db, "attendance"), {
+                    student: name,
+                    index: index,
+                    classId: classId,
+                    timestamp: serverTimestamp()
+                });
+
+                document.getElementById('mainUI').style.display = 'none';
+                const msgBox = document.getElementById('responseMsg');
+                msgBox.innerText = "✅ Success! Attendance recorded.";
+                msgBox.className = "msg success";
+                msgBox.style.display = "block";
+
+            } catch (e) {
+                alert("Error: " + e.message);
+                document.getElementById('submitBtn').disabled = false;
+            }
+        };
+
+        function blockUser(message) {
+            document.getElementById('mainUI').innerHTML = "";
+            const msgBox = document.getElementById('responseMsg');
+            msgBox.innerText = message;
+            msgBox.className = "msg error";
+            msgBox.style.display = "block";
+        }
+
+        getDeviceID();
+    </script>
+</body>
+</html>
