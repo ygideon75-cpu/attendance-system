@@ -3,149 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Attendance System</title>
+    <title>Student Attendance</title>
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f0f2f5; padding: 20px; }
+        body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f0f2f5; padding: 20px; }
         .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 400px; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-        button { width: 100%; background: #1a73e8; color: white; border: none; padding: 15px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; }
-        button:disabled { background: #ccc; }
+        h2 { color: #1a73e8; margin-bottom: 10px; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; background: #1a73e8; color: white; border: none; padding: 15px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; font-size: 16px; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
         #status { margin-top: 15px; font-weight: bold; color: #666; }
-        .msg { margin-top: 20px; padding: 15px; border-radius: 8px; display: none; font-weight: bold; }
-        .error { background: #ffeef0; color: #d73a49; }
-        .success { background: #e6ffed; color: #28a745; }
+        .success-msg { color: #28a745; font-weight: bold; margin-top: 20px; display: none; padding: 15px; background: #e6ffed; border-radius: 8px; border: 1px solid #28a745; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <h2 id="className">Checking Connection...</h2>
+        <h2 id="className">Connecting...</h2>
         <div id="mainUI">
+            <p>Enter your details to mark attendance.</p>
             <input type="text" id="studentName" placeholder="Full Name">
             <input type="text" id="studentIndex" placeholder="Index Number">
-            <div id="status">Waiting for GPS...</div>
+            <div id="status">Detecting Location...</div>
             <button id="submitBtn" disabled onclick="submitAttendance()">Mark Present</button>
         </div>
-        <div id="responseMsg" class="msg"></div>
+        <div id="successBox" class="success-msg">✅ Attendance Marked Successfully!</div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // YOUR FIREBASE CONFIG
         const firebaseConfig = {
-            apiKey: "AIzaSyC6TqpzjJNSJ5d2CCJl7WL4RrmyIvTk8DA",
-            authDomain: "qr-code-attendace.firebaseapp.com",
-            projectId: "qr-code-attendace",
-            storageBucket: "qr-code-attendace.firebasestorage.app",
-            messagingSenderId: "346712215800",
-            appId: "1:346712215800:web:0e2127df0ee4e2049c6b0d"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        
-        const urlParams = new URLSearchParams(window.location.search);
-        const classId = urlParams.get('class') || "cs101"; 
-        
-        let classData = null;
-        // Simple Device ID based on browser info
-        const deviceId = btoa(navigator.userAgent).substring(0, 16);
-
-        async function startApp() {
-            try {
-                const docRef = doc(db, "classes", classId);
-                const snap = await getDoc(docRef);
-                
-                if (snap.exists()) {
-                    classData = snap.data();
-                    document.getElementById('className').innerText = classData.name;
-                    initGPS();
-                } else {
-                    document.getElementById('className').innerText = "Class Not Found";
-                    document.getElementById('status').innerText = "Check your URL (?class=" + classId + ")";
-                }
-            } catch (e) {
-                alert("Firebase Error: " + e.message);
-            }
-        }
-
-        function initGPS() {
-            if (!navigator.geolocation) {
-                alert("GPS not supported on this phone.");
-                return;
-            }
-
-            navigator.geolocation.watchPosition((pos) => {
-                const dist = calculateDistance(pos.coords.latitude, pos.coords.longitude, classData.lat, classData.lng);
-                
-                if (dist <= classData.radius) {
-                    document.getElementById('status').innerText = "Location Verified ✅";
-                    document.getElementById('status').style.color = "green";
-                    document.getElementById('submitBtn').disabled = false;
-                } else {
-                    document.getElementById('status').innerText = "Too far from class (" + Math.round(dist) + "m)";
-                    document.getElementById('status').style.color = "red";
-                    document.getElementById('submitBtn').disabled = true;
-                }
-            }, (err) => {
-                document.getElementById('status').innerText = "Please allow Location Access.";
-            }, { enableHighAccuracy: true });
-        }
-
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3;
-            const dLat = (lat2-lat1) * Math.PI/180;
-            const dLon = (lon2-lon1) * Math.PI/180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
-
-        window.submitAttendance = async () => {
-            const name = document.getElementById('studentName').value.trim();
-            const index = document.getElementById('studentIndex').value.trim();
-            if(!name || !index) return alert("Enter Name and Index");
-
-            document.getElementById('submitBtn').disabled = true;
-            document.getElementById('submitBtn').innerText = "Verifying...";
-
-            const today = new Date().toISOString().split('T')[0];
-            const devLock = `${today}_${classId}_DEV_${deviceId}`;
-            const idxLock = `${today}_${classId}_IDX_${index}`;
-
-            try {
-                // Check Locks
-                const dSnap = await getDoc(doc(db, "locks", devLock));
-                const iSnap = await getDoc(doc(db, "locks", idxLock));
-
-                if (dSnap.exists() || iSnap.exists()) {
-                    showResponse("❌ Access Denied: Attendance already marked for this device or index today.", "error");
-                    return;
-                }
-
-                // Create Locks
-                await setDoc(doc(db, "locks", devLock), { used: true });
-                await setDoc(doc(db, "locks", idxLock), { used: true });
-
-                // Save Attendance
-                await addDoc(collection(db, "attendance"), {
-                    student: name,
-                    index: index,
-                    classId: classId,
-                    timestamp: serverTimestamp()
-                });
-
-                showResponse("✅ Success! Attendance recorded.", "success");
-
-            } catch (e) {
-                alert("Error: " + e.message);
-                document.getElementById('submitBtn').disabled = false;
-            }
-        };
-
-        function showResponse(text, type) {
-            document.getElementById('mainUI').style.display = 'none';
-            const msg = document.getElementById('responseMsg');
-            msg.innerText = text;
-            msg.className = "msg "
+            apiKey: "AIzaSyC6TqpzjJNSJ5d2CCJl7WL4RrmyIvTk8
