@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Teacher Dashboard</title>
-    <!-- QR Code Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; display: flex; flex-direction: column; min-height: 100vh; }
         header { background: #1a73e8; color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
@@ -13,18 +11,16 @@
         .sidebar { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); width: 300px; }
         .main-content { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); flex-grow: 1; min-width: 350px; }
         
-        /* Fixed QR Code Container */
-        #qrcode-container { 
-            background: white; 
+        /* QR Code Image Styling */
+        .qr-area { 
+            text-align: center; 
+            margin: 20px 0; 
             padding: 10px; 
-            border: 1px solid #ddd; 
-            width: 200px; 
-            height: 200px; 
-            margin: 20px auto; 
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            border: 2px dashed #1a73e8; 
+            border-radius: 10px;
+            background: #f8f9fa;
         }
+        #qrImage { width: 200px; height: 200px; display: block; margin: 0 auto; }
 
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
@@ -53,12 +49,11 @@
             <input type="text" id="classIdInput" value="cs101" onchange="refreshDashboard()">
         </div>
 
-        <!-- The QR Code will be drawn inside this div -->
-        <div id="qrcode-container">
-            <div id="qrcode"></div>
+        <!-- QR Code Image (100% Reliable) -->
+        <div class="qr-area">
+            <img id="qrImage" src="" alt="Generating QR Code...">
+            <p style="font-size: 11px; color: #888; margin-top: 10px;">Scan to mark attendance</p>
         </div>
-        
-        <p style="text-align: center; font-size: 11px; color: #888;">Scan to mark attendance</p>
 
         <button style="background:#6c757d;" onclick="updateLocation()">Update Class Location</button>
         <button class="btn-download" onclick="downloadCSV()">📊 Download List (CSV)</button>
@@ -100,15 +95,6 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Initialize QR Code Generator once
-    const qrcode = new QRCode(document.getElementById("qrcode"), {
-        width: 180,
-        height: 180,
-        colorDark : "#000000",
-        colorLight : "#ffffff",
-        correctLevel : QRCode.CorrectLevel.H
-    });
-
     // Set default date to Today
     const now = new Date();
     const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
@@ -118,10 +104,11 @@
         const cid = document.getElementById('classIdInput').value;
         const selectedDate = document.getElementById('viewDate').value;
         
-        // Generate QR Code
+        // Generate QR Code using a reliable API (it returns an image)
         const studentUrl = `https://ygideon75-cpu.github.io/attendance-system/?class=${cid}`;
-        qrcode.clear(); 
-        qrcode.makeCode(studentUrl);
+        const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(studentUrl)}`;
+        
+        document.getElementById('qrImage').src = qrApiUrl;
         
         listenForAttendance(cid, selectedDate);
     };
@@ -179,8 +166,8 @@
                 lat: pos.coords.latitude, 
                 lng: pos.coords.longitude 
             });
-            alert("Class location updated to your current position!");
-        }, (err) => alert("Error: Please enable GPS to update location."));
+            alert("Class location updated!");
+        }, (err) => alert("Error: Please enable GPS."));
     };
 
     // Initial Load
