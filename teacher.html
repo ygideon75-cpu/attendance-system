@@ -5,54 +5,36 @@
     <title>Teacher Dashboard</title>
     <style>
         body { font-family: sans-serif; background: #f4f4f9; margin: 0; display: flex; }
-        .sidebar { width: 280px; background: white; height: 100vh; padding: 20px; border-right: 1px solid #ddd; position: fixed; box-sizing: border-box; }
-        .main { margin-left: 280px; padding: 30px; flex-grow: 1; }
-        .qr-box { text-align: center; margin: 20px 0; padding: 10px; border: 1px solid #ddd; background: #fafafa; }
-        #qrImage { width: 180px; height: 180px; display: block; margin: 0 auto; }
-        table { width: 100%; border-collapse: collapse; background: white; margin-top: 20px; }
-        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
-        th { background: #007bff; color: white; }
-        button { width: 100%; padding: 12px; margin-top: 10px; cursor: pointer; font-weight: bold; border-radius: 5px; border: none; color: white; }
-        .btn-gray { background: #6c757d; }
-        .btn-green { background: #28a745; }
-        .btn-orange { background: #fd7e14; }
-        input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-        .stats { font-size: 24px; font-weight: bold; margin-bottom: 20px; color: #007bff; }
+        .sidebar { width: 250px; background: white; height: 100vh; padding: 20px; border-right: 1px solid #ddd; position: fixed; }
+        .main { margin-left: 290px; padding: 20px; flex-grow: 1; }
+        .qr-box { text-align: center; margin: 20px 0; padding: 10px; border: 1px solid #ddd; }
+        #qrImage { width: 150px; height: 150px; }
+        table { width: 100%; border-collapse: collapse; background: white; }
+        th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+        th { background: #eee; }
+        button { width: 100%; padding: 10px; margin-top: 5px; cursor: pointer; border-radius: 4px; border: 1px solid #ccc; }
+        .btn-excel { background: #28a745; color: white; font-weight: bold; margin-top: 20px; }
+        .stats { font-size: 20px; font-weight: bold; margin-bottom: 20px; }
     </style>
 </head>
 <body>
-
     <div class="sidebar">
         <h3>Controls</h3>
         <label>Class ID:</label>
         <input type="text" id="classIdInput" value="cs101" onchange="refresh()">
-        
         <div class="qr-box">
-            <img id="qrImage" src="" alt="QR Code">
+            <img id="qrImage" src="">
         </div>
-
-        <button class="btn-gray" onclick="updateLoc()">📍 Set Room GPS</button>
-        
-        <hr style="margin: 20px 0;">
-        
-        <button class="btn-green" onclick="downloadCSV()">📊 Download CSV</button>
-        <button class="btn-orange" onclick="copyToClipboard()">📋 Copy for Excel</button>
-        <p style="font-size: 11px; color: #666; text-align: center; margin-top: 5px;">Use "Copy" if Download fails</p>
+        <button onclick="updateLoc()">Update Location</button>
+        <button class="btn-excel" onclick="download()">📊 Download to Excel</button>
     </div>
 
     <div class="main">
-        <div class="stats">Total Present: <span id="count">0</span></div>
-        
-        <label>Filter by Date:</label>
-        <input type="date" id="viewDate" style="width: 200px;" onchange="refresh()">
-
+        <div class="stats">Total: <span id="count">0</span></div>
+        <input type="date" id="viewDate" onchange="refresh()">
         <table>
             <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Student Name</th>
-                    <th>Index Number</th>
-                </tr>
+                <tr><th>Time</th><th>Name</th><th>Index</th></tr>
             </thead>
             <tbody id="list"></tbody>
         </table>
@@ -73,13 +55,12 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-
         document.getElementById('viewDate').value = new Date().toISOString().split('T')[0];
 
         window.refresh = () => {
             const cid = document.getElementById('classIdInput').value;
             const url = `https://ygideon75-cpu.github.io/attendance-system/?class=${cid}`;
-            document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}`;
+            document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(url)}`;
             load(cid);
         };
 
@@ -87,31 +68,38 @@
         function load(cid) {
             if(unsub) unsub();
             unsub = onSnapshot(query(collection(db, "attendance"), where("classId", "==", cid)), (snap) => {
-                const selectedDate = document.getElementById('viewDate').value;
+                const date = document.getElementById('viewDate').value;
                 const filtered = snap.docs.map(d => d.data()).filter(d => {
                     if(!d.timestamp) return false;
-                    return d.timestamp.toDate().toISOString().split('T')[0] === selectedDate;
+                    return d.timestamp.toDate().toISOString().split('T')[0] === date;
                 }).sort((a,b) => b.timestamp - a.timestamp);
-
                 document.getElementById('count').innerText = filtered.length;
-                document.getElementById('list').innerHTML = filtered.map(d => `
-                    <tr>
-                        <td>${d.timestamp.toDate().toLocaleTimeString()}</td>
-                        <td>${d.student}</td>
-                        <td>${d.index}</td>
-                    </tr>
-                `).join('') || "<tr><td colspan='3' style='text-align:center;'>No records.</td></tr>";
+                document.getElementById('list').innerHTML = filtered.map(d => `<tr><td>${d.timestamp.toDate().toLocaleTimeString()}</td><td>${d.student}</td><td>${d.index}</td></tr>`).join('');
             });
         }
 
-        // --- THE "ULTIMATE FIX" DOWNLOAD FUNCTION ---
-        window.downloadCSV = () => {
-            const rows = document.querySelectorAll("#list tr");
-            if (rows.length === 0 || rows[0].cells.length < 3) return alert("No data to download");
-
-            // 1. Add BOM (\ufeff) so Excel opens it correctly
-            let csv = "\ufeffTime,Name,Index\n";
+        window.download = () => {
+            let csv = "Time,Name,Index\n";
+            document.querySelectorAll("#list tr").forEach(tr => {
+                csv += Array.from(tr.cells).map(td => td.innerText.replace(/,/g, "")).join(",") + "\n";
+            });
             
-            rows.forEach(tr => {
-                if (tr.cells.length >= 3) {
-                    // Remove any commas from the names to
+            // This is the original method that triggers Excel immediately
+            const link = document.createElement("a");
+            link.setAttribute("href", "data:text/csv;charset=utf-8,\ufeff" + encodeURIComponent(csv));
+            link.setAttribute("download", "attendance.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        window.updateLoc = () => {
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                await updateDoc(doc(db, "classes", document.getElementById('classIdInput').value), { lat: pos.coords.latitude, lng: pos.coords.longitude });
+                alert("Location Updated!");
+            });
+        };
+        refresh();
+    </script>
+</body>
+</html>
