@@ -3,34 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Class Attendance</title>
+    <title>Student Attendance</title>
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f4f4f9; padding: 20px; }
-        .card { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 350px; }
-        h2 { margin-top: 0; color: #333; }
-        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 16px; }
-        button { width: 100%; background: #007bff; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px; }
+        body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f0f2f5; padding: 20px; }
+        .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 400px; }
+        h2 { color: #1a73e8; margin-bottom: 10px; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; background: #1a73e8; color: white; border: none; padding: 15px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; font-size: 16px; }
         button:disabled { background: #ccc; cursor: not-allowed; }
-        #status { margin-top: 15px; font-weight: bold; color: #666; font-size: 14px; }
-        .success-msg { color: #28a745; font-weight: bold; margin-top: 20px; display: none; }
+        #status { margin-top: 15px; font-weight: bold; color: #666; min-height: 20px; }
+        .success-msg { color: #28a745; font-weight: bold; margin-top: 20px; display: none; padding: 15px; background: #e6ffed; border-radius: 8px; border: 1px solid #28a745; }
     </style>
 </head>
 <body>
 
-    <div class="card" id="mainCard">
-        <h2 id="className">Loading class...</h2>
-        <div id="formUI">
+    <div class="card">
+        <h2 id="className">Connecting...</h2>
+        <div id="mainUI">
+            <p>Enter your details to mark attendance.</p>
             <input type="text" id="studentName" placeholder="Full Name">
             <input type="text" id="studentIndex" placeholder="Index Number">
-            <div id="status">Detecting location...</div>
+            <div id="status">Waiting for GPS signal...</div>
             <button id="submitBtn" disabled onclick="submitAttendance()">Mark Present</button>
         </div>
-        <div id="successMsg" class="success-msg">✅ Attendance Marked Successfully!</div>
+        <div id="successBox" class="success-msg">✅ Attendance Marked Successfully!</div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, doc, getDoc, addDoc, collection, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyC6TqpzjJNSJ5d2CCJl7WL4RrmyIvTk8DA",
@@ -43,6 +44,7 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+        
         const urlParams = new URLSearchParams(window.location.search);
         const classId = urlParams.get('class') || "cs101"; 
         let classData = null;
@@ -56,28 +58,50 @@
                     document.getElementById('className').innerText = classData.name;
                     startGPS();
                 } else {
-                    document.getElementById('status').innerText = "Class not found.";
+                    document.getElementById('status').innerText = "Class ID '" + classId + "' not found.";
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) { alert("Firebase Error: " + e.message); }
         }
 
         function startGPS() {
+            if (!navigator.geolocation) {
+                document.getElementById('status').innerText = "GPS not supported on this phone.";
+                return;
+            }
+
+            // Options for faster/more accurate GPS
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            };
+
             navigator.geolocation.watchPosition((pos) => {
                 if(!classData) return;
-                const d = calculateDistance(pos.coords.latitude, pos.coords.longitude, classData.lat, classData.lng);
-                const statusDiv = document.getElementById('status');
+                
+                const uLat = pos.coords.latitude;
+                const uLng = pos.coords.longitude;
+                const d = calculateDistance(uLat, uLng, classData.lat, classData.lng);
+                
                 if (d <= classData.radius) {
-                    statusDiv.innerText = "Location Verified ✅";
-                    statusDiv.style.color = "green";
+                    document.getElementById('status').innerText = "Location Verified ✅";
+                    document.getElementById('status').style.color = "green";
                     document.getElementById('submitBtn').disabled = false;
                 } else {
-                    statusDiv.innerText = "Too far from class (" + Math.round(d) + "m)";
-                    statusDiv.style.color = "red";
+                    document.getElementById('status').innerText = "Too far from class (" + Math.round(d) + "m)";
+                    document.getElementById('status').style.color = "red";
                     document.getElementById('submitBtn').disabled = true;
                 }
             }, (err) => {
-                document.getElementById('status').innerText = "Please enable GPS.";
-            }, {enableHighAccuracy: true});
+                // ERROR HANDLING
+                if (err.code === 1) {
+                    document.getElementById('status').innerText = "Error: Location Permission Denied. Please allow GPS.";
+                } else if (err.code === 2) {
+                    document.getElementById('status').innerText = "Error: GPS signal weak. Move near a window.";
+                } else {
+                    document.getElementById('status').innerText = "Error: Searching for GPS...";
+                }
+            }, options);
         }
 
         function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -91,34 +115,20 @@
         window.submitAttendance = async () => {
             const name = document.getElementById('studentName').value.trim();
             const index = document.getElementById('studentIndex').value.trim();
-            if(!name || !index) return alert("Enter details");
-
-            const today = new Date().toISOString().split('T')[0];
-            const lockID = `${today}_${classId}_${index}`;
+            if(!name || !index) return alert("Enter Name and Index");
 
             try {
                 document.getElementById('submitBtn').disabled = true;
-                
-                // Once-per-day check
-                const lockRef = doc(db, "locks", lockID);
-                const lockSnap = await getDoc(lockRef);
-                if (lockSnap.exists()) {
-                    alert("You have already marked attendance today!");
-                    location.reload();
-                    return;
-                }
-
-                await setDoc(lockRef, { used: true });
+                document.getElementById('submitBtn').innerText = "Saving...";
                 await addDoc(collection(db, "attendance"), {
                     student: name,
                     index: index,
                     classId: classId,
                     timestamp: serverTimestamp()
                 });
-
-                document.getElementById('formUI').style.display = 'none';
-                document.getElementById('successMsg').style.display = 'block';
-            } catch (e) { alert(e.message); }
+                document.getElementById('mainUI').style.display = 'none';
+                document.getElementById('successBox').style.display = 'block';
+            } catch (e) { alert("Error: " + e.message); }
         };
 
         init();
