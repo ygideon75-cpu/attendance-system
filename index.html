@@ -88,7 +88,6 @@
             const index = document.getElementById('studentIndex').value.trim();
             if(!name || !index) return alert("Enter details");
 
-            // Fix for slashes in index numbers
             const safeIndex = index.replace(/\//g, "-");
             const today = new Date().toISOString().split('T')[0];
             const lockID = `${today}_${classId}_${safeIndex}`;
