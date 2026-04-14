@@ -11,11 +11,12 @@
             --primary-dark: #0056b3;
             --success: #28a745;
             --warning: #fd7e14;
-            --bg: #f4f7fa;
+            --bg: #f0f4f8; /* New soft blue-gray background */
             --sidebar: #ffffff;
-            --text-main: #333333;
-            --text-muted: #6c757d;
-            --border: #dee2e6;
+            --card: #ffffff;
+            --text-main: #334155;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
         }
 
         body {
@@ -38,26 +39,29 @@
             position: fixed;
             height: 100vh;
             box-sizing: border-box;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+            box-shadow: 4px 0 10px rgba(0,0,0,0.03);
+            z-index: 10;
         }
 
         h1 {
-            font-size: 1.4rem;
-            font-weight: 700;
+            font-size: 1.3rem;
+            font-weight: 800;
             color: var(--primary);
             margin: 0 0 2rem;
             text-align: center;
+            letter-spacing: -0.02em;
         }
 
         .control-group { margin-bottom: 1.5rem; }
 
         label {
             display: block;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: 700;
             text-transform: uppercase;
             color: var(--text-muted);
             margin-bottom: 0.5rem;
+            letter-spacing: 0.05em;
         }
 
         input {
@@ -67,12 +71,13 @@
             border-radius: 0.5rem;
             font-size: 0.9rem;
             box-sizing: border-box;
+            background: #f8fafc;
         }
 
         .qr-card {
-            background: #f8f9fa;
+            background: #f8fafc;
             padding: 1rem;
-            border-radius: 0.5rem;
+            border-radius: 0.75rem;
             text-align: center;
             margin-bottom: 1.5rem;
             border: 1px solid var(--border);
@@ -81,8 +86,9 @@
         #qrImage {
             width: 160px;
             height: 160px;
+            border-radius: 4px;
             border: 3px solid white;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }
 
         button {
@@ -92,15 +98,15 @@
             border: none;
             font-weight: 700;
             cursor: pointer;
-            transition: 0.2s;
-            margin-bottom: 0.5rem;
+            transition: all 0.2s;
+            margin-bottom: 0.6rem;
         }
 
         .btn-blue { background: var(--primary); color: white; }
-        .btn-blue:hover { background: var(--primary-dark); }
+        .btn-blue:hover { background: var(--primary-dark); transform: translateY(-1px); }
         
-        .btn-gray { background: #6c757d; color: white; }
-        .btn-gray:hover { background: #5a6268; }
+        .btn-gray { background: #f1f5f9; color: #475569; border: 1px solid var(--border); }
+        .btn-gray:hover { background: #e2e8f0; }
 
         .btn-green { background: var(--success); color: white; margin-top: 1rem; }
         .btn-orange { background: var(--warning); color: white; }
@@ -119,31 +125,34 @@
         }
 
         .stat-card {
-            background: white;
-            padding: 1.2rem 1.5rem;
-            border-radius: 0.75rem;
+            background: var(--card);
+            padding: 1.5rem;
+            border-radius: 1rem;
             border: 1px solid var(--border);
             flex: 1;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         }
 
-        .stat-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
-        .stat-value { font-size: 2.2rem; font-weight: 800; color: var(--primary); margin-top: 5px; }
+        .stat-label { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+        .stat-value { font-size: 2.5rem; font-weight: 800; color: var(--primary); margin-top: 5px; }
 
         /* Table */
         .table-container {
-            background: white;
-            border-radius: 0.75rem;
+            background: var(--card);
+            border-radius: 1rem;
             border: 1px solid var(--border);
             overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
         }
 
         table { width: 100%; border-collapse: collapse; }
-        th { background: #f8f9fa; padding: 1rem; text-align: left; font-size: 0.8rem; color: var(--text-muted); border-bottom: 1px solid var(--border); }
-        td { padding: 1rem; border-bottom: 1px solid #f1f1f1; font-size: 0.95rem; }
+        th { background: #f8fafc; padding: 1.2rem 1rem; text-align: left; font-size: 0.75rem; color: var(--text-muted); border-bottom: 1px solid var(--border); text-transform: uppercase; }
+        td { padding: 1.2rem 1rem; border-bottom: 1px solid #f1f5f9; font-size: 0.95rem; }
+        tr:hover { background-color: #f8fafc; }
         
-        .time-text { color: var(--primary); font-weight: 600; font-family: monospace; }
-        .index-text { background: #e9ecef; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.85rem; }
+        .time-text { color: var(--primary); font-weight: 600; font-family: 'Courier New', Courier, monospace; background: #eef2ff; padding: 4px 8px; border-radius: 4px; }
+        .index-text { background: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-family: monospace; font-size: 0.85rem; color: #475569; border: 1px solid #e2e8f0; }
+        .student-name { font-weight: 600; color: #1e293b; }
     </style>
 </head>
 <body>
@@ -152,7 +161,7 @@
         <h1>Attendance Dashboard</h1>
         
         <div class="control-group">
-            <label>Class ID</label>
+            <label>Current Class ID</label>
             <input type="text" id="classIdInput" value="cs101" onchange="refresh()">
         </div>
 
@@ -176,8 +185,8 @@
                 <div class="stat-value" id="count">0</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Filter Date</div>
-                <input type="date" id="viewDate" onchange="refresh()" style="margin-top: 0.5rem; border: 1px solid #ddd; padding: 5px; border-radius: 4px; width: 100%;">
+                <div class="stat-label">Filter By Date</div>
+                <input type="date" id="viewDate" onchange="refresh()" style="margin-top: 0.5rem; border: 1px solid var(--border); padding: 8px; border-radius: 6px; width: 100%; font-family: inherit; font-weight: 600; color: var(--primary);">
             </div>
         </div>
 
@@ -185,13 +194,13 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Time</th>
+                        <th>Arrival Time</th>
                         <th>Student Name</th>
                         <th>Index Number</th>
                     </tr>
                 </thead>
                 <tbody id="list">
-                    <!-- Data -->
+                    <!-- Data will appear here -->
                 </tbody>
             </table>
         </div>
@@ -236,11 +245,11 @@
                 document.getElementById('list').innerHTML = filtered.map(d => {
                     const time = d.timestamp.toDate().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                     return `<tr>
-                        <td class="time-text">${time}</td>
-                        <td><strong>${d.student}</strong></td>
+                        <td><span class="time-text">${time}</span></td>
+                        <td class="student-name">${d.student}</td>
                         <td><span class="index-text">${d.index}</span></td>
                     </tr>`;
-                }).join('') || "<tr><td colspan='3' style='text-align:center; padding: 3rem; color: #999;'>No records for this date.</td></tr>";
+                }).join('') || "<tr><td colspan='3' style='text-align:center; padding: 4rem; color: var(--text-muted);'>No records found for this date.</td></tr>";
             });
         }
 
@@ -267,13 +276,13 @@
                     text += `${tr.cells[0].innerText}\t${tr.cells[1].innerText}\t${tr.cells[2].innerText}\n`;
                 }
             });
-            navigator.clipboard.writeText(text).then(() => alert("Copied! Paste into Excel (Ctrl+V)"));
+            navigator.clipboard.writeText(text).then(() => alert("Copied to clipboard! Paste into Excel (Ctrl+V)."));
         };
 
         window.updateLoc = () => {
             navigator.geolocation.getCurrentPosition(async (pos) => {
                 await updateDoc(doc(db, "classes", document.getElementById('classIdInput').value), { lat: pos.coords.latitude, lng: pos.coords.longitude });
-                alert("Location Updated!");
+                alert("Room GPS Updated!");
             });
         };
 
