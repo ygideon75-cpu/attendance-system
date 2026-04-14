@@ -3,27 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Attendance Pro | Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <title>Attendance Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #020617; /* Deep Midnight Navy */
-            --sidebar: #0f172a; /* Slate Navy */
-            --glass: rgba(30, 41, 59, 0.7);
-            --glass-border: rgba(148, 163, 184, 0.1);
-            --accent: #0ea5e9; /* Electric Cyan */
-            --accent-glow: rgba(14, 165, 233, 0.4);
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --success: #22c55e;
+            --primary: #007bff;
+            --primary-dark: #0056b3;
+            --bg: #f8fafc;
+            --sidebar: #ffffff;
+            --card: #ffffff;
+            --text-main: #334155;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --success: #28a745;
         }
 
         body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-family: 'Inter', sans-serif;
             background-color: var(--bg);
-            background-image: 
-                radial-gradient(at 0% 0%, rgba(14, 165, 233, 0.15) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(14, 165, 233, 0.1) 0px, transparent 50%);
             color: var(--text-main);
             margin: 0;
             display: flex;
@@ -34,216 +31,157 @@
         .sidebar {
             width: 280px;
             background: var(--sidebar);
-            border-right: 1px solid var(--glass-border);
-            padding: 2.5rem 1.5rem;
+            border-right: 1px solid var(--border);
+            padding: 2rem;
             display: flex;
             flex-direction: column;
             position: fixed;
             height: 100vh;
             box-sizing: border-box;
-            z-index: 100;
         }
 
-        .logo {
-            font-size: 1.2rem;
-            font-weight: 800;
-            margin-bottom: 3rem;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            color: var(--text-main);
+        h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin: 0 0 2rem;
+            text-align: center;
         }
 
-        .logo-icon {
-            width: 35px;
-            height: 35px;
-            background: var(--accent);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 0 20px var(--accent-glow);
-            color: white;
-            font-weight: 900;
-        }
+        .control-group { margin-bottom: 1.5rem; }
 
-        .nav-label {
-            font-size: 0.65rem;
-            font-weight: 800;
+        label {
+            display: block;
+            font-size: 0.7rem;
+            font-weight: 700;
             text-transform: uppercase;
             color: var(--text-muted);
-            margin-bottom: 1rem;
-            letter-spacing: 0.15em;
+            margin-bottom: 0.5rem;
         }
 
         input {
             width: 100%;
-            padding: 0.8rem 1rem;
-            background: rgba(2, 6, 23, 0.5);
-            border: 1px solid var(--glass-border);
-            border-radius: 12px;
-            color: white;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
             font-size: 0.9rem;
-            margin-bottom: 1.5rem;
-            transition: all 0.2s;
+            box-sizing: border-box;
         }
 
-        input:focus {
-            outline: none;
-            border-color: var(--accent);
-            box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.1);
-        }
-
-        .qr-container {
-            background: white;
+        .qr-card {
+            background: #f8fafc;
             padding: 1rem;
-            border-radius: 20px;
-            margin-bottom: 2rem;
-            display: flex;
-            justify-content: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border-radius: 0.75rem;
+            text-align: center;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
         }
 
-        #qrImage { width: 160px; height: 160px; }
+        #qrImage {
+            width: 160px;
+            height: 160px;
+            border: 2px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
 
         button {
             width: 100%;
-            padding: 0.9rem;
-            border-radius: 12px;
-            border: 1px solid var(--glass-border);
+            padding: 0.8rem;
+            border-radius: 0.5rem;
+            border: none;
             font-weight: 700;
             cursor: pointer;
-            transition: all 0.3s;
-            margin-bottom: 0.8rem;
-            font-size: 0.85rem;
+            transition: 0.2s;
+            margin-bottom: 0.6rem;
         }
 
-        .btn-primary { background: var(--accent); color: white; border: none; }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px var(--accent-glow); }
+        .btn-blue { background: var(--primary); color: white; }
+        .btn-blue:hover { background: var(--primary-dark); }
         
-        .btn-glass { background: rgba(255,255,255,0.05); color: white; }
-        .btn-glass:hover { background: rgba(255,255,255,0.1); border-color: var(--accent); }
+        .btn-gray { background: #6c757d; color: white; }
+        .btn-gray:hover { background: #5a6268; }
+
+        .btn-green { background: var(--success); color: white; margin-top: 1rem; }
+        .btn-orange { background: #fd7e14; color: white; }
 
         /* Main Content */
-        .main {
+        .main-content {
             margin-left: 280px;
-            padding: 3rem;
+            padding: 2.5rem;
             flex-grow: 1;
         }
 
-        .header-section {
+        .stats-row {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 3rem;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
         }
 
         .stat-card {
-            background: var(--glass);
-            border: 1px solid var(--glass-border);
-            padding: 1.5rem 2.5rem;
-            border-radius: 24px;
-            backdrop-filter: blur(12px);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            background: var(--card);
+            padding: 1.5rem;
+            border-radius: 1rem;
+            border: 1px solid var(--border);
+            flex: 1;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
-        .stat-label { color: var(--text-muted); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-        .stat-value { font-size: 3.5rem; font-weight: 800; margin-top: 0.5rem; color: var(--accent); text-shadow: 0 0 20px rgba(14, 165, 233, 0.3); }
-
-        .date-input-container {
-            background: var(--sidebar);
-            border: 1px solid var(--glass-border);
-            padding: 0.6rem 1.2rem;
-            border-radius: 14px;
-        }
+        .stat-label { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+        .stat-value { font-size: 2.5rem; font-weight: 800; color: var(--primary); margin-top: 5px; }
 
         /* Table */
-        .table-card {
-            background: var(--glass);
-            border: 1px solid var(--glass-border);
-            border-radius: 28px;
+        .table-container {
+            background: var(--card);
+            border-radius: 1rem;
+            border: 1px solid var(--border);
             overflow: hidden;
-            backdrop-filter: blur(20px);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
         table { width: 100%; border-collapse: collapse; }
-        th { 
-            text-align: left; 
-            padding: 1.2rem 1.5rem; 
-            font-size: 0.7rem; 
-            color: var(--text-muted); 
-            text-transform: uppercase; 
-            letter-spacing: 0.1em;
-            border-bottom: 1px solid var(--glass-border);
-            background: rgba(255,255,255,0.03);
-        }
-        td { padding: 1.2rem 1.5rem; border-bottom: 1px solid var(--glass-border); font-size: 0.95rem; }
-        tr:hover { background: rgba(14, 165, 233, 0.05); }
-
-        .time-cell { color: var(--accent); font-weight: 800; font-family: 'Courier New', monospace; }
-        .index-cell { color: var(--text-muted); font-family: monospace; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; }
+        th { background: #f8fafc; padding: 1rem; text-align: left; font-size: 0.75rem; color: var(--text-muted); border-bottom: 1px solid var(--border); text-transform: uppercase; }
+        td { padding: 1rem; border-bottom: 1px solid #f1f5f9; font-size: 0.95rem; }
         
-        .live-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(34, 197, 94, 0.1);
-            color: var(--success);
-            padding: 6px 12px;
-            border-radius: 100px;
-            font-size: 0.75rem;
-            font-weight: 700;
-            border: 1px solid rgba(34, 197, 94, 0.2);
-        }
-
-        .dot { width: 6px; height: 6px; background: var(--success); border-radius: 50%; animation: blink 1.5s infinite; }
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        .time-badge { color: var(--primary); font-weight: 700; font-family: monospace; background: #eef2ff; padding: 4px 8px; border-radius: 4px; }
+        .index-badge { background: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-family: monospace; font-size: 0.85rem; color: #475569; border: 1px solid var(--border); }
     </style>
 </head>
 <body>
 
     <aside class="sidebar">
-        <div class="logo">
-            <div class="logo-icon">A</div>
-            Attendance Pro
-        </div>
+        <h1>Attendance Dashboard</h1>
         
-        <div class="nav-label">Class Settings</div>
-        <input type="text" id="classIdInput" value="cs101" onchange="refresh()">
-
-        <div class="nav-label">QR Access Point</div>
-        <div class="qr-container">
-            <img id="qrImage" src="" alt="QR Code">
+        <div class="control-group">
+            <label>Class ID</label>
+            <input type="text" id="classIdInput" value="cs101" onchange="refresh()">
         </div>
 
-        <button class="btn-glass" onclick="updateLoc()">📍 Update Room GPS</button>
+        <div class="qr-card">
+            <img id="qrImage" src="" alt="QR Code">
+            <p style="font-size: 0.65rem; color: var(--text-muted); margin-top: 10px; font-weight: 700;">SCAN TO MARK PRESENT</p>
+        </div>
+
+        <button class="btn-gray" onclick="updateLoc()">📍 Update Room GPS</button>
         
         <div style="margin-top: auto;">
-            <button class="btn-primary" onclick="downloadExcel()">📥 Download CSV</button>
-            <button class="btn-glass" onclick="copyTable()">📋 Copy for Excel</button>
+            <button class="btn-green" onclick="downloadExcel()">📥 Download CSV</button>
+            <button class="btn-orange" onclick="copyTable()">📋 Copy for Excel</button>
         </div>
     </aside>
 
-    <main class="main">
-        <div class="header-section">
-            <div>
-                <div class="live-badge"><span class="dot"></span> System Live</div>
-                <h2 style="margin: 10px 0 0; font-size: 2rem; letter-spacing: -0.03em;">Attendance Overview</h2>
-            </div>
-            <div class="date-input-container">
-                <input type="date" id="viewDate" onchange="refresh()" style="margin:0; border:none; background:transparent; font-weight:700; cursor:pointer;">
-            </div>
-        </div>
-
-        <div class="header-section" style="justify-content: flex-start;">
+    <main class="main-content">
+        <div class="stats-row">
             <div class="stat-card">
                 <div class="stat-label">Students Present</div>
                 <div class="stat-value" id="count">0</div>
             </div>
+            <div class="stat-card">
+                <div class="stat-label">Filter Date</div>
+                <input type="date" id="viewDate" onchange="refresh()" style="margin-top: 0.5rem; border: 1px solid #ddd; padding: 8px; border-radius: 6px; width: 100%; font-family: inherit; font-weight: 600; color: var(--primary);">
+            </div>
         </div>
 
-        <div class="table-card">
+        <div class="table-container">
             <table>
                 <thead>
                     <tr>
@@ -296,13 +234,14 @@
 
                 document.getElementById('count').innerText = filtered.length;
                 document.getElementById('list').innerHTML = filtered.map(d => {
-                    const time = d.timestamp.toDate().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                    // Shorter 24h format to prevent Excel column width issues
+                    const time = d.timestamp.toDate().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                     return `<tr>
-                        <td class="time-cell">${time}</td>
-                        <td style="font-weight:600;">${d.student}</td>
-                        <td><span class="index-cell">${d.index}</span></td>
+                        <td><span class="time-badge">${time}</span></td>
+                        <td><strong>${d.student}</strong></td>
+                        <td><span class="index-badge">${d.index}</span></td>
                     </tr>`;
-                }).join('') || "<tr><td colspan='3' style='text-align:center; padding: 5rem; color: var(--text-muted);'>No records found for this date.</td></tr>";
+                }).join('') || "<tr><td colspan='3' style='text-align:center; padding: 3rem; color: #999;'>No records for this date.</td></tr>";
             });
         }
 
@@ -317,7 +256,7 @@
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.href = url;
-            link.setAttribute("download", "attendance_report.csv");
+            link.setAttribute("download", "report.csv");
             document.body.appendChild(link);
             link.click();
         };
@@ -329,13 +268,13 @@
                     text += `${tr.cells[0].innerText}\t${tr.cells[1].innerText}\t${tr.cells[2].innerText}\n`;
                 }
             });
-            navigator.clipboard.writeText(text).then(() => alert("Copied to clipboard!"));
+            navigator.clipboard.writeText(text).then(() => alert("Copied! Paste into Excel (Ctrl+V)"));
         };
 
         window.updateLoc = () => {
             navigator.geolocation.getCurrentPosition(async (pos) => {
                 await updateDoc(doc(db, "classes", document.getElementById('classIdInput').value), { lat: pos.coords.latitude, lng: pos.coords.longitude });
-                alert("Room GPS Updated Successfully!");
+                alert("Room GPS Updated!");
             });
         };
 
