@@ -92,29 +92,40 @@
             const index = document.getElementById('studentIndex').value.trim();
             if(!name || !index) return alert("Enter details");
 
+            // FIX: Replace slashes with dashes so Firebase doesn't crash
+            const safeIndex = index.replace(/\//g, "-");
             const today = new Date().toISOString().split('T')[0];
-            const lockID = `${today}_${classId}_${index}`;
+            const lockID = `${today}_${classId}_${safeIndex}`;
 
             try {
                 document.getElementById('submitBtn').disabled = true;
+                document.getElementById('submitBtn').innerText = "Checking...";
+
                 const lockRef = doc(db, "locks", lockID);
                 const lockSnap = await getDoc(lockRef);
                 if (lockSnap.exists()) {
-                    alert("Error: You have already marked attendance today!");
+                    alert("Error: You have already marked attendance for this class today!");
                     location.reload();
                     return;
                 }
+
                 await setDoc(lockRef, { used: true });
                 await addDoc(collection(db, "attendance"), {
                     student: name,
-                    index: index,
+                    index: index, // Original index with slashes is saved here
                     classId: classId,
                     timestamp: serverTimestamp()
                 });
+
                 document.getElementById('formUI').style.display = 'none';
                 document.getElementById('successMsg').style.display = 'block';
-            } catch (e) { alert(e.message); }
+            } catch (e) { 
+                alert("Error: " + e.message); 
+                document.getElementById('submitBtn').disabled = false;
+                document.getElementById('submitBtn').innerText = "Mark Present";
+            }
         };
+
         init();
     </script>
 </body>
