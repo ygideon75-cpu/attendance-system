@@ -8,29 +8,21 @@
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f4f4f9; padding: 20px; }
         .card { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 350px; }
         h2 { margin-top: 0; color: #333; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 16px; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 16px; }
         button { width: 100%; background: #007bff; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px; }
         button:disabled { background: #ccc; cursor: not-allowed; }
-        .verify-btn { background: #28a745; margin-bottom: 10px; }
         #status { margin-top: 15px; font-weight: bold; color: #666; font-size: 14px; }
         .success-msg { color: #28a745; font-weight: bold; margin-top: 20px; display: none; padding: 15px; background: #e6ffed; border-radius: 8px; border: 1px solid #28a745; }
     </style>
 </head>
 <body>
-
     <div class="card">
         <h2 id="className">Connecting...</h2>
         <div id="formUI">
             <input type="text" id="studentName" placeholder="Full Name">
             <input type="text" id="studentIndex" placeholder="Index Number">
-            
-            <div id="status">Enter details then verify location</div>
-            
-            <!-- Step 1: Verify Location -->
-            <button id="verifyBtn" class="verify-btn" onclick="verifyLocation()">1. Verify My Location</button>
-            
-            <!-- Step 2: Mark Present (Hidden until verified) -->
-            <button id="submitBtn" style="display:none;" onclick="submitAttendance()">2. Mark Present</button>
+            <div id="status">Detecting location...</div>
+            <button id="submitBtn" disabled onclick="submitAttendance()">Mark Present</button>
         </div>
         <div id="successMsg" class="success-msg">✅ Attendance Marked Successfully!</div>
     </div>
@@ -61,52 +53,26 @@
                 if (snap.exists()) {
                     classData = snap.data();
                     document.getElementById('className').innerText = classData.name;
-                } else {
-                    document.getElementById('status').innerText = "Class not found.";
+                    startGPS();
                 }
             } catch (e) { console.error(e); }
         }
 
-        window.verifyLocation = function() {
-            const statusDiv = document.getElementById('status');
-            const verifyBtn = document.getElementById('verifyBtn');
-            const submitBtn = document.getElementById('submitBtn');
-
-            statusDiv.innerText = "Checking GPS... please wait";
-            verifyBtn.disabled = true;
-            verifyBtn.innerText = "Searching...";
-
-            if (!navigator.geolocation) {
-                statusDiv.innerText = "GPS not supported.";
-                return;
-            }
-
-            // We use a slightly more relaxed timeout and accuracy setting for speed
-            const geoOptions = {
-                enableHighAccuracy: true, 
-                timeout: 8000, 
-                maximumAge: 0
-            };
-
-            navigator.geolocation.getCurrentPosition((pos) => {
+        function startGPS() {
+            navigator.geolocation.watchPosition((pos) => {
+                if(!classData) return;
                 const d = calculateDistance(pos.coords.latitude, pos.coords.longitude, classData.lat, classData.lng);
-                
+                const statusDiv = document.getElementById('status');
                 if (d <= classData.radius) {
                     statusDiv.innerText = "Location Verified ✅";
                     statusDiv.style.color = "green";
-                    verifyBtn.style.display = "none";
-                    submitBtn.style.display = "block";
+                    document.getElementById('submitBtn').disabled = false;
                 } else {
                     statusDiv.innerText = "Too far from class (" + Math.round(d) + "m)";
                     statusDiv.style.color = "red";
-                    verifyBtn.disabled = false;
-                    verifyBtn.innerText = "Retry Verification";
+                    document.getElementById('submitBtn').disabled = true;
                 }
-            }, (err) => {
-                statusDiv.innerText = "GPS Error: " + err.message + ". Try moving near a window.";
-                verifyBtn.disabled = false;
-                verifyBtn.innerText = "Retry Verification";
-            }, geoOptions);
+            }, null, {enableHighAccuracy: true});
         }
 
         function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -122,14 +88,13 @@
             const index = document.getElementById('studentIndex').value.trim();
             if(!name || !index) return alert("Enter details");
 
+            // Fix for slashes in index numbers
             const safeIndex = index.replace(/\//g, "-");
             const today = new Date().toISOString().split('T')[0];
             const lockID = `${today}_${classId}_${safeIndex}`;
 
             try {
                 document.getElementById('submitBtn').disabled = true;
-                document.getElementById('submitBtn').innerText = "Saving...";
-
                 const lockRef = doc(db, "locks", lockID);
                 const lockSnap = await getDoc(lockRef);
                 if (lockSnap.exists()) {
@@ -137,7 +102,6 @@
                     location.reload();
                     return;
                 }
-
                 await setDoc(lockRef, { used: true });
                 await addDoc(collection(db, "attendance"), {
                     student: name,
@@ -145,15 +109,10 @@
                     classId: classId,
                     timestamp: serverTimestamp()
                 });
-
                 document.getElementById('formUI').style.display = 'none';
                 document.getElementById('successMsg').style.display = 'block';
-            } catch (e) { 
-                alert(e.message); 
-                document.getElementById('submitBtn').disabled = false;
-            }
+            } catch (e) { alert(e.message); }
         };
-
         init();
     </script>
 </body>
