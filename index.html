@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Attendance</title>
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f4f4f9; padding: 20px; }
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f4f4f9; padding: 20px; }
         .card { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 350px; }
         h2 { margin-top: 0; color: #333; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 16px; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 16px; }
         button { width: 100%; background: #007bff; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px; }
         #status { margin-top: 15px; font-weight: bold; color: #666; font-size: 14px; }
+        .debug-panel { margin-top: 20px; padding: 10px; background: #eee; border-radius: 5px; font-size: 11px; text-align: left; font-family: monospace; color: #444; width: 100%; box-sizing: border-box; }
         .success-msg { color: #28a745; font-weight: bold; margin-top: 20px; display: none; padding: 15px; background: #e6ffed; border-radius: 8px; border: 1px solid #28a745; }
     </style>
 </head>
@@ -21,12 +22,20 @@
         <div id="formUI">
             <input type="text" id="studentName" placeholder="Full Name">
             <input type="text" id="studentIndex" placeholder="Index Number">
-            
             <div id="status">Ready to mark attendance</div>
-            
             <button id="submitBtn" onclick="processAttendance()">Mark Present</button>
         </div>
         <div id="successMsg" class="success-msg">✅ Attendance Marked Successfully!</div>
+
+        <!-- DEBUG PANEL -->
+        <div class="debug-panel" id="debug">
+            <strong>DEBUG INFO:</strong><br>
+            Phone Lat: <span id="pLat">0</span><br>
+            Phone Lng: <span id="pLng">0</span><br>
+            Class Lat: <span id="cLat">0</span><br>
+            Class Lng: <span id="cLng">0</span><br>
+            Distance: <span id="dist">0</span>m
+        </div>
     </div>
 
     <script type="module">
@@ -52,4 +61,86 @@
             try {
                 const docRef = doc(db, "classes", classId);
                 const snap = await getDoc(docRef);
-                if (snap.e
+                if (snap.exists()) {
+                    classData = snap.data();
+                    document.getElementById('className').innerText = classData.name;
+                    document.getElementById('cLat').innerText = classData.lat;
+                    document.getElementById('cLng').innerText = classData.lng;
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        window.processAttendance = async function() {
+            const name = document.getElementById('studentName').value.trim();
+            const index = document.getElementById('studentIndex').value.trim();
+            const statusDiv = document.getElementById('status');
+            const submitBtn = document.getElementById('submitBtn');
+
+            if(!name || !index) return alert("Please enter Name and Index");
+
+            submitBtn.disabled = true;
+            submitBtn.innerText = "Checking GPS...";
+
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const uLat = pos.coords.latitude;
+                const uLng = pos.coords.longitude;
+                
+                // Update Debug UI
+                document.getElementById('pLat').innerText = uLat.toFixed(6);
+                document.getElementById('pLng').innerText = uLng.toFixed(6);
+
+                const d = calculateDistance(uLat, uLng, classData.lat, classData.lng);
+                document.getElementById('dist').innerText = Math.round(d);
+                
+                if (d <= classData.radius) {
+                    statusDiv.innerText = "Location Verified ✅";
+                    saveToFirebase(name, index);
+                } else {
+                    statusDiv.innerText = `Too far! You are ${Math.round(d)}m away.`;
+                    statusDiv.style.color = "red";
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = "Try Again";
+                }
+            }, (err) => {
+                alert("GPS Error: " + err.message);
+                submitBtn.disabled = false;
+            }, { enableHighAccuracy: true, timeout: 10000 });
+        }
+
+        async function saveToFirebase(name, index) {
+            const safeIndex = index.replace(/\//g, "-");
+            const today = new Date().toISOString().split('T')[0];
+            const lockID = `${today}_${classId}_${safeIndex}`;
+
+            try {
+                const lockRef = doc(db, "locks", lockID);
+                const lockSnap = await getDoc(lockRef);
+                if (lockSnap.exists()) {
+                    alert("Already marked today!");
+                    location.reload();
+                    return;
+                }
+                await setDoc(lockRef, { used: true });
+                await addDoc(collection(db, "attendance"), {
+                    student: name,
+                    index: index,
+                    classId: classId,
+                    timestamp: serverTimestamp()
+                });
+                document.getElementById('formUI').style.display = 'none';
+                document.getElementById('successMsg').style.display = 'block';
+            } catch (e) { alert(e.message); }
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const dLat = (lat2-lat1) * Math.PI/180;
+            const dLon = (lon2-lon1) * Math.PI/180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        init();
+    </script>
+</body>
+</html>
