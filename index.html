@@ -6,7 +6,7 @@
     <title>Student Attendance</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f0f2f5; padding: 20px; }
-        .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 400px; box-sizing: border-box; }
+        .card { background: white; padding: 35px; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 400px; box-sizing: border-box; }
         
         h2 { color: #1a73e8; margin-bottom: 5px; font-size: 28px; font-weight: bold; }
         .subtitle { color: #333; margin-bottom: 25px; font-size: 16px; }
@@ -19,11 +19,6 @@
         button { width: 100%; background: #1a73e8; color: white; border: none; padding: 15px; border-radius: 8px; cursor: pointer; font-size: 18px; font-weight: bold; margin-top: 10px; transition: 0.3s; }
         button:disabled { background: #ccc; cursor: not-allowed; }
         
-        .gps-box { margin-top: 25px; padding: 15px; background: #f8f9fa; border: 1px solid #eee; border-radius: 8px; font-size: 13px; color: #777; text-align: left; line-height: 1.6; }
-        .gps-box strong { color: #555; }
-        
-        .refresh-btn { background: #6c757d; color: white; border: none; padding: 8px 15px; border-radius: 5px; font-size: 12px; cursor: pointer; margin-top: 10px; width: auto; }
-        
         .success-state { display: none; }
         .success-icon { font-size: 50px; color: #28a745; margin-bottom: 10px; }
     </style>
@@ -33,7 +28,7 @@
     <div class="card">
         <!-- FORM UI -->
         <div id="formUI">
-            <h2 id="className">Algebra</h2>
+            <h2 id="className">Loading...</h2>
             <p class="subtitle">Enter your details to register</p>
             
             <input type="text" id="studentName" placeholder="Full Name">
@@ -42,136 +37,9 @@
             <div id="status">Detecting Location...</div>
             
             <button id="submitBtn" disabled onclick="submitAttendance()">Mark Present</button>
-
-            <div class="gps-box">
-                <strong>GPS Status:</strong><br>
-                Lat: <span id="lat">0.00000</span> | Lng: <span id="lng">0.00000</span><br>
-                Distance: <span id="dist">0</span>m
-            </div>
-            <button class="refresh-btn" onclick="location.reload()">Refresh GPS</button>
         </div>
 
         <!-- SUCCESS UI -->
         <div id="successUI" class="success-state">
             <div class="success-icon">✅</div>
-            <h2 style="color: #28a745;">Success!</h2>
-            <p class="subtitle">Your attendance has been recorded.</p>
-            <button onclick="location.reload()" style="background: #f1f5f9; color: #475569; font-size: 14px;">Submit Another</button>
-        </div>
-    </div>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, doc, getDoc, addDoc, collection, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyC6TqpzjJNSJ5d2CCJl7WL4RrmyIvTk8DA",
-            authDomain: "qr-code-attendace.firebaseapp.com",
-            projectId: "qr-code-attendace",
-            storageBucket: "qr-code-attendace.firebasestorage.app",
-            messagingSenderId: "346712215800",
-            appId: "1:346712215800:web:0e2127df0ee4e2049c6b0d"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const urlParams = new URLSearchParams(window.location.search);
-        const classId = urlParams.get('class') || "cs101"; 
-        let classData = null;
-
-        async function init() {
-            try {
-                const docRef = doc(db, "classes", classId);
-                const snap = await getDoc(docRef);
-                if (snap.exists()) {
-                    classData = snap.data();
-                    document.getElementById('className').innerText = classData.name;
-                    startGPS();
-                } else {
-                    document.getElementById('status').innerText = "Class not found.";
-                }
-            } catch (e) { console.error(e); }
-        }
-
-        function startGPS() {
-            if (!navigator.geolocation) return alert("GPS not supported");
-            
-            navigator.geolocation.watchPosition((pos) => {
-                if(!classData) return;
-                
-                const uLat = pos.coords.latitude;
-                const uLng = pos.coords.longitude;
-                
-                // Update GPS Box
-                document.getElementById('lat').innerText = uLat.toFixed(5);
-                document.getElementById('lng').innerText = uLng.toFixed(5);
-
-                const d = calculateDistance(uLat, uLng, classData.lat, classData.lng);
-                document.getElementById('dist').innerText = Math.round(d);
-                
-                const statusDiv = document.getElementById('status');
-                if (d <= classData.radius) {
-                    statusDiv.innerText = "Location Verified ✅";
-                    statusDiv.style.color = "#28a745";
-                    document.getElementById('submitBtn').disabled = false;
-                } else {
-                    statusDiv.innerText = "Too far from class!";
-                    statusDiv.style.color = "#dc3545";
-                    document.getElementById('submitBtn').disabled = true;
-                }
-            }, (err) => {
-                document.getElementById('status').innerText = "Please enable GPS.";
-            }, {enableHighAccuracy: true});
-        }
-
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3;
-            const dLat = (lat2-lat1) * Math.PI/180;
-            const dLon = (lon2-lon1) * Math.PI/180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
-
-        window.submitAttendance = async () => {
-            const name = document.getElementById('studentName').value.trim();
-            const index = document.getElementById('studentIndex').value.trim();
-            if(!name || !index) return alert("Please enter Name and Index");
-
-            // Fix for slashes in index numbers
-            const safeIndex = index.replace(/\//g, "-");
-            const today = new Date().toISOString().split('T')[0];
-            const lockID = `${today}_${classId}_${safeIndex}`;
-
-            try {
-                document.getElementById('submitBtn').disabled = true;
-                document.getElementById('submitBtn').innerText = "Checking...";
-
-                const lockRef = doc(db, "locks", lockID);
-                const lockSnap = await getDoc(lockRef);
-                if (lockSnap.exists()) {
-                    alert("Error: You have already marked attendance for this class today!");
-                    location.reload();
-                    return;
-                }
-
-                await setDoc(lockRef, { used: true });
-                await addDoc(collection(db, "attendance"), {
-                    student: name,
-                    index: index,
-                    classId: classId,
-                    timestamp: serverTimestamp()
-                });
-
-                document.getElementById('formUI').style.display = 'none';
-                document.getElementById('successUI').style.display = 'block';
-            } catch (e) { 
-                alert("Error: " + e.message); 
-                document.getElementById('submitBtn').disabled = false;
-                document.getElementById('submitBtn').innerText = "Mark Present";
-            }
-        };
-
-        init();
-    </script>
-</body>
-</html>
+            <h2 style="color: #28a745;">Suc
