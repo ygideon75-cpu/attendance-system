@@ -8,20 +8,25 @@
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f4f4f9; padding: 20px; }
         .card { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 350px; }
         h2 { margin-top: 0; color: #333; }
-        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 16px; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 16px; }
         button { width: 100%; background: #007bff; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px; }
         button:disabled { background: #ccc; cursor: not-allowed; }
-        #status { margin-top: 15px; font-weight: bold; color: #666; font-size: 14px; }
+        #status { margin-top: 15px; font-weight: bold; color: #666; font-size: 14px; min-height: 20px; }
+        .retry-btn { background: #6c757d; font-size: 12px; padding: 8px; margin-top: 5px; width: auto; }
         .success-msg { color: #28a745; font-weight: bold; margin-top: 20px; display: none; padding: 15px; background: #e6ffed; border-radius: 8px; border: 1px solid #28a745; }
     </style>
 </head>
 <body>
+
     <div class="card">
         <h2 id="className">Connecting...</h2>
         <div id="formUI">
             <input type="text" id="studentName" placeholder="Full Name">
             <input type="text" id="studentIndex" placeholder="Index Number">
-            <div id="status">Detecting location...</div>
+            
+            <div id="status">Initializing GPS...</div>
+            <button id="retryBtn" class="retry-btn" style="display:none;" onclick="startGPS()">Retry GPS</button>
+            
             <button id="submitBtn" disabled onclick="submitAttendance()">Mark Present</button>
         </div>
         <div id="successMsg" class="success-msg">✅ Attendance Marked Successfully!</div>
@@ -54,25 +59,51 @@
                     classData = snap.data();
                     document.getElementById('className').innerText = classData.name;
                     startGPS();
+                } else {
+                    document.getElementById('status').innerText = "Class not found.";
                 }
             } catch (e) { console.error(e); }
         }
 
-        function startGPS() {
-            navigator.geolocation.watchPosition((pos) => {
-                if(!classData) return;
+        window.startGPS = function() {
+            const statusDiv = document.getElementById('status');
+            const retryBtn = document.getElementById('retryBtn');
+            const submitBtn = document.getElementById('submitBtn');
+
+            statusDiv.innerText = "Detecting location...";
+            statusDiv.style.color = "#666";
+            retryBtn.style.display = "none";
+
+            if (!navigator.geolocation) {
+                statusDiv.innerText = "GPS not supported.";
+                return;
+            }
+
+            // High Accuracy can be slow. We add a timeout of 10 seconds.
+            const geoOptions = {
+                enableHighAccuracy: true, 
+                timeout: 10000, 
+                maximumAge: 0
+            };
+
+            navigator.geolocation.getCurrentPosition((pos) => {
                 const d = calculateDistance(pos.coords.latitude, pos.coords.longitude, classData.lat, classData.lng);
-                const statusDiv = document.getElementById('status');
+                
                 if (d <= classData.radius) {
                     statusDiv.innerText = "Location Verified ✅";
                     statusDiv.style.color = "green";
-                    document.getElementById('submitBtn').disabled = false;
+                    submitBtn.disabled = false;
                 } else {
                     statusDiv.innerText = "Too far from class (" + Math.round(d) + "m)";
                     statusDiv.style.color = "red";
-                    document.getElementById('submitBtn').disabled = true;
+                    submitBtn.disabled = true;
+                    retryBtn.style.display = "inline-block";
                 }
-            }, null, {enableHighAccuracy: true});
+            }, (err) => {
+                statusDiv.innerText = "GPS Error: " + err.message;
+                statusDiv.style.color = "red";
+                retryBtn.style.display = "inline-block";
+            }, geoOptions);
         }
 
         function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -94,6 +125,8 @@
 
             try {
                 document.getElementById('submitBtn').disabled = true;
+                document.getElementById('submitBtn').innerText = "Checking...";
+
                 const lockRef = doc(db, "locks", lockID);
                 const lockSnap = await getDoc(lockRef);
                 if (lockSnap.exists()) {
@@ -101,6 +134,7 @@
                     location.reload();
                     return;
                 }
+
                 await setDoc(lockRef, { used: true });
                 await addDoc(collection(db, "attendance"), {
                     student: name,
@@ -108,10 +142,16 @@
                     classId: classId,
                     timestamp: serverTimestamp()
                 });
+
                 document.getElementById('formUI').style.display = 'none';
                 document.getElementById('successMsg').style.display = 'block';
-            } catch (e) { alert(e.message); }
+            } catch (e) { 
+                alert(e.message); 
+                document.getElementById('submitBtn').disabled = false;
+                document.getElementById('submitBtn').innerText = "Mark Present";
+            }
         };
+
         init();
     </script>
 </body>
