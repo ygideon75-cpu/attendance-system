@@ -3,63 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teacher Dashboard</title>
+    <title>Class Attendance</title>
     <style>
-        :root { --primary: #4f46e5; --bg: #f8fafc; }
-        body { font-family: 'Inter', sans-serif; background: var(--bg); margin: 0; display: flex; color: #1e293b; }
-        .sidebar { width: 320px; background: white; height: 100vh; border-right: 1px solid #e2e8f0; padding: 2rem; box-sizing: border-box; position: fixed; }
-        .main { margin-left: 320px; padding: 2rem; width: 100%; }
-        h1 { font-size: 1.5rem; font-weight: 800; margin: 0 0 1.5rem; color: #111827; }
-        .qr-card { text-align: center; background: #f1f5f9; border-radius: 1rem; padding: 1rem; margin-bottom: 1.5rem; }
-        #qrImage { width: 180px; height: 180px; border-radius: 0.5rem; border: 4px solid white; }
-        label { display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 0.5rem; }
-        input { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.5rem; margin-bottom: 1rem; font-size: 0.9rem; }
-        button { width: 100%; padding: 0.75rem; border-radius: 0.5rem; border: none; font-weight: 700; cursor: pointer; margin-bottom: 0.5rem; }
-        .btn-secondary { background: #f1f5f9; color: #475569; }
-        .btn-success { background: #10b981; color: white; }
-        table { width: 100%; border-collapse: collapse; background: white; border-radius: 1rem; overflow: hidden; border: 1px solid #e2e8f0; }
-        th { background: #f8fafc; text-align: left; padding: 1rem; font-size: 0.875rem; color: #64748b; border-bottom: 1px solid #e2e8f0; }
-        td { padding: 1rem; font-size: 0.95rem; border-bottom: 1px solid #f1f5f9; }
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem; }
-        .stat-card { background: white; padding: 1.5rem; border-radius: 1rem; border: 1px solid #e2e8f0; }
-        .stat-val { font-size: 2rem; font-weight: 800; color: var(--primary); }
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f4f4f9; padding: 20px; }
+        .card { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 350px; }
+        h2 { margin-top: 0; color: #333; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; background: #007bff; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        #status { margin-top: 15px; font-weight: bold; color: #666; font-size: 14px; }
+        .success-msg { color: #28a745; font-weight: bold; margin-top: 20px; display: none; }
     </style>
 </head>
 <body>
 
-    <div class="sidebar">
-        <h1>Admin Panel</h1>
-        <label>Class ID</label>
-        <input type="text" id="classIdInput" value="cs101" onchange="refreshDashboard()">
-        <div class="qr-card">
-            <img id="qrImage" src="" alt="QR Code">
+    <div class="card" id="mainCard">
+        <h2 id="className">Loading class...</h2>
+        <div id="formUI">
+            <input type="text" id="studentName" placeholder="Full Name">
+            <input type="text" id="studentIndex" placeholder="Index Number">
+            <div id="status">Detecting location...</div>
+            <button id="submitBtn" disabled onclick="submitAttendance()">Mark Present</button>
         </div>
-        <button class="btn-secondary" onclick="updateLocation()">📍 Update Room GPS</button>
-        <button class="btn-success" onclick="downloadCSV()">📊 Export to Excel</button>
-    </div>
-
-    <div class="main">
-        <div class="stats-grid">
-            <div class="stat-card">
-                <label>Present Today</label>
-                <div class="stat-val" id="count">0</div>
-            </div>
-            <div class="stat-card">
-                <label>Select Date</label>
-                <input type="date" id="viewDate" onchange="refreshDashboard()" style="margin:0; margin-top:0.5rem;">
-            </div>
-        </div>
-        <table>
-            <thead>
-                <tr><th>Time</th><th>Student Name</th><th>Index Number</th></tr>
-            </thead>
-            <tbody id="attendanceList"></tbody>
-        </table>
+        <div id="successMsg" class="success-msg">✅ Attendance Marked Successfully!</div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, addDoc, collection, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyC6TqpzjJNSJ5d2CCJl7WL4RrmyIvTk8DA",
@@ -72,59 +43,85 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+        const urlParams = new URLSearchParams(window.location.search);
+        const classId = urlParams.get('class') || "cs101"; 
+        let classData = null;
 
-        const now = new Date();
-        const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-        document.getElementById('viewDate').value = todayStr;
-
-        window.refreshDashboard = () => {
-            const cid = document.getElementById('classIdInput').value;
-            const studentUrl = `https://ygideon75-cpu.github.io/attendance-system/?class=${cid}`;
-            document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(studentUrl)}`;
-            listenForAttendance(cid);
-        };
-
-        let unsub = null;
-        function listenForAttendance(cid) {
-            if(unsub) unsub();
-            unsub = onSnapshot(query(collection(db, "attendance"), where("classId", "==", cid)), (snap) => {
-                const selectedDate = document.getElementById('viewDate').value;
-                const filtered = snap.docs.map(d => d.data()).filter(d => {
-                    if(!d.timestamp) return false;
-                    const date = d.timestamp.toDate();
-                    return (date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0')) === selectedDate;
-                }).sort((a,b) => b.timestamp - a.timestamp);
-
-                document.getElementById('count').innerText = filtered.length;
-                document.getElementById('attendanceList').innerHTML = filtered.map(d => `
-                    <tr>
-                        <td>${d.timestamp.toDate().toLocaleTimeString()}</td>
-                        <td>${d.student}</td>
-                        <td>${d.index}</td>
-                    </tr>
-                `).join('') || '<tr><td colspan="3" style="text-align:center; padding:2rem;">No records for this date.</td></tr>';
-            });
+        async function init() {
+            try {
+                const docRef = doc(db, "classes", classId);
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    classData = snap.data();
+                    document.getElementById('className').innerText = classData.name;
+                    startGPS();
+                } else {
+                    document.getElementById('status').innerText = "Class not found.";
+                }
+            } catch (e) { console.error(e); }
         }
 
-        window.downloadCSV = () => {
-            let csv = "Time,Name,Index\n";
-            document.querySelectorAll("#attendanceList tr").forEach(row => {
-                if(row.cells.length === 3) csv += `"${row.cells[0].innerText}","${row.cells[1].innerText}","${row.cells[2].innerText}"\n`;
-            });
-            const link = document.createElement("a");
-            link.href = encodeURI("data:text/csv;charset=utf-8," + csv);
-            link.download = `Attendance_${document.getElementById('classIdInput').value}.csv`;
-            link.click();
+        function startGPS() {
+            navigator.geolocation.watchPosition((pos) => {
+                if(!classData) return;
+                const d = calculateDistance(pos.coords.latitude, pos.coords.longitude, classData.lat, classData.lng);
+                const statusDiv = document.getElementById('status');
+                if (d <= classData.radius) {
+                    statusDiv.innerText = "Location Verified ✅";
+                    statusDiv.style.color = "green";
+                    document.getElementById('submitBtn').disabled = false;
+                } else {
+                    statusDiv.innerText = "Too far from class (" + Math.round(d) + "m)";
+                    statusDiv.style.color = "red";
+                    document.getElementById('submitBtn').disabled = true;
+                }
+            }, (err) => {
+                document.getElementById('status').innerText = "Please enable GPS.";
+            }, {enableHighAccuracy: true});
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const dLat = (lat2-lat1) * Math.PI/180;
+            const dLon = (lon2-lon1) * Math.PI/180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        window.submitAttendance = async () => {
+            const name = document.getElementById('studentName').value.trim();
+            const index = document.getElementById('studentIndex').value.trim();
+            if(!name || !index) return alert("Enter details");
+
+            const today = new Date().toISOString().split('T')[0];
+            const lockID = `${today}_${classId}_${index}`;
+
+            try {
+                document.getElementById('submitBtn').disabled = true;
+                
+                // Once-per-day check
+                const lockRef = doc(db, "locks", lockID);
+                const lockSnap = await getDoc(lockRef);
+                if (lockSnap.exists()) {
+                    alert("You have already marked attendance today!");
+                    location.reload();
+                    return;
+                }
+
+                await setDoc(lockRef, { used: true });
+                await addDoc(collection(db, "attendance"), {
+                    student: name,
+                    index: index,
+                    classId: classId,
+                    timestamp: serverTimestamp()
+                });
+
+                document.getElementById('formUI').style.display = 'none';
+                document.getElementById('successMsg').style.display = 'block';
+            } catch (e) { alert(e.message); }
         };
 
-        window.updateLocation = () => {
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-                await updateDoc(doc(db, "classes", document.getElementById('classIdInput').value), { lat: pos.coords.latitude, lng: pos.coords.longitude });
-                alert("Location Updated!");
-            });
-        };
-
-        refreshDashboard();
+        init();
     </script>
 </body>
 </html>
