@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Class Attendance</title>
+    <title>Student Attendance</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f4f4f9; padding: 20px; }
         .card { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 350px; }
@@ -16,11 +16,9 @@
     </style>
 </head>
 <body>
-
     <div class="card">
         <h2 id="className">Connecting...</h2>
         <div id="formUI">
-            <p>Enter details to mark attendance.</p>
             <input type="text" id="studentName" placeholder="Full Name">
             <input type="text" id="studentIndex" placeholder="Index Number">
             <div id="status">Detecting location...</div>
@@ -59,7 +57,7 @@
                 } else {
                     document.getElementById('status').innerText = "Class not found.";
                 }
-            } catch (e) { alert("Error: " + e.message); }
+            } catch (e) { console.error(e); }
         }
 
         function startGPS() {
@@ -99,8 +97,6 @@
 
             try {
                 document.getElementById('submitBtn').disabled = true;
-                document.getElementById('submitBtn').innerText = "Checking...";
-
                 const lockRef = doc(db, "locks", lockID);
                 const lockSnap = await getDoc(lockRef);
                 if (lockSnap.exists()) {
@@ -108,7 +104,6 @@
                     location.reload();
                     return;
                 }
-
                 await setDoc(lockRef, { used: true });
                 await addDoc(collection(db, "attendance"), {
                     student: name,
@@ -116,12 +111,10 @@
                     classId: classId,
                     timestamp: serverTimestamp()
                 });
-
                 document.getElementById('formUI').style.display = 'none';
                 document.getElementById('successMsg').style.display = 'block';
             } catch (e) { alert(e.message); }
         };
-
         init();
     </script>
 </body>
