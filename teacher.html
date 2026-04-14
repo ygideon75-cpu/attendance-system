@@ -15,19 +15,22 @@
         button { width: 100%; padding: 12px; margin-top: 10px; cursor: pointer; font-weight: bold; border-radius: 5px; border: none; color: white; }
         .btn-gray { background: #6c757d; }
         .btn-green { background: #28a745; }
-        .btn-orange { background: #fd7e14; margin-top: 5px; }
+        .btn-orange { background: #fd7e14; }
         input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
         .stats { font-size: 24px; font-weight: bold; margin-bottom: 20px; color: #007bff; }
     </style>
 </head>
 <body>
+
     <div class="sidebar">
         <h3>Controls</h3>
         <label>Class ID:</label>
         <input type="text" id="classIdInput" value="cs101" onchange="refresh()">
+        
         <div class="qr-box">
             <img id="qrImage" src="" alt="QR Code">
         </div>
+
         <button class="btn-gray" onclick="updateLoc()">📍 Set Room GPS</button>
         
         <hr style="margin: 20px 0;">
@@ -39,11 +42,17 @@
 
     <div class="main">
         <div class="stats">Total Present: <span id="count">0</span></div>
+        
         <label>Filter by Date:</label>
         <input type="date" id="viewDate" style="width: 200px;" onchange="refresh()">
+
         <table>
             <thead>
-                <tr><th>Time</th><th>Student Name</th><th>Index Number</th></tr>
+                <tr>
+                    <th>Time</th>
+                    <th>Student Name</th>
+                    <th>Index Number</th>
+                </tr>
             </thead>
             <tbody id="list"></tbody>
         </table>
@@ -64,6 +73,7 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+
         document.getElementById('viewDate').value = new Date().toISOString().split('T')[0];
 
         window.refresh = () => {
@@ -82,47 +92,26 @@
                     if(!d.timestamp) return false;
                     return d.timestamp.toDate().toISOString().split('T')[0] === selectedDate;
                 }).sort((a,b) => b.timestamp - a.timestamp);
+
                 document.getElementById('count').innerText = filtered.length;
-                document.getElementById('list').innerHTML = filtered.map(d => `<tr><td>${d.timestamp.toDate().toLocaleTimeString()}</td><td>${d.student}</td><td>${d.index}</td></tr>`).join('') || "<tr><td colspan='3' style='text-align:center;'>No records.</td></tr>";
+                document.getElementById('list').innerHTML = filtered.map(d => `
+                    <tr>
+                        <td>${d.timestamp.toDate().toLocaleTimeString()}</td>
+                        <td>${d.student}</td>
+                        <td>${d.index}</td>
+                    </tr>
+                `).join('') || "<tr><td colspan='3' style='text-align:center;'>No records.</td></tr>";
             });
         }
 
-        function getCSVData() {
-            let csv = "Time\tName\tIndex\n"; // Using Tabs for easier Excel pasting
-            document.querySelectorAll("#list tr").forEach(tr => {
-                if (tr.cells.length >= 3) {
-                    csv += `${tr.cells[0].innerText}\t${tr.cells[1].innerText}\t${tr.cells[2].innerText}\n`;
-                }
-            });
-            return csv;
-        }
-
+        // --- THE "ULTIMATE FIX" DOWNLOAD FUNCTION ---
         window.downloadCSV = () => {
-            const csv = getCSVData().replace(/\t/g, ","); // Change tabs to commas for CSV file
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = "attendance.csv";
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-        };
+            const rows = document.querySelectorAll("#list tr");
+            if (rows.length === 0 || rows[0].cells.length < 3) return alert("No data to download");
 
-        window.copyToClipboard = () => {
-            const data = getCSVData();
-            navigator.clipboard.writeText(data).then(() => {
-                alert("Table copied! Open Excel and press Ctrl+V to paste.");
-            });
-        };
-
-        window.updateLoc = () => {
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-                await updateDoc(doc(db, "classes", document.getElementById('classIdInput').value), { lat: pos.coords.latitude, lng: pos.coords.longitude });
-                alert("GPS Updated!");
-            });
-        };
-        refresh();
-    </script>
-</body>
-</html>
+            // 1. Add BOM (\ufeff) so Excel opens it correctly
+            let csv = "\ufeffTime,Name,Index\n";
+            
+            rows.forEach(tr => {
+                if (tr.cells.length >= 3) {
+                    // Remove any commas from the names to
