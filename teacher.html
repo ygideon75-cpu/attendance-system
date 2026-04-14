@@ -1,71 +1,47 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Teacher Dashboard</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; display: flex; flex-direction: column; min-height: 100vh; }
-        header { background: #1a73e8; color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .container { display: flex; flex-wrap: wrap; padding: 20px; gap: 20px; }
-        .sidebar { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); width: 300px; }
-        .main-content { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); flex-grow: 1; min-width: 350px; }
-        
-        /* QR Code Image Styling */
-        .qr-area { 
-            text-align: center; 
-            margin: 20px 0; 
-            padding: 10px; 
-            border: 2px dashed #1a73e8; 
-            border-radius: 10px;
-            background: #f8f9fa;
-        }
-        #qrImage { width: 200px; height: 200px; display: block; margin: 0 auto; }
-
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #f8f9fa; color: #555; }
-        
-        .control-group { margin-bottom: 20px; }
-        label { display: block; font-size: 12px; font-weight: bold; color: #666; margin-bottom: 5px; }
-        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
-        
-        button { width: 100%; background: #1a73e8; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; }
-        .btn-download { background: #34a853; margin-top: 20px; }
-        .date-selector { background: #e8f0fe; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        body { font-family: sans-serif; background: #f4f4f9; margin: 0; display: flex; }
+        .sidebar { width: 280px; background: white; height: 100vh; padding: 20px; border-right: 1px solid #ddd; position: fixed; box-sizing: border-box; }
+        .main { margin-left: 280px; padding: 30px; flex-grow: 1; }
+        .qr-box { text-align: center; margin: 20px 0; padding: 10px; border: 1px solid #ddd; background: #fafafa; }
+        #qrImage { width: 180px; height: 180px; display: block; margin: 0 auto; }
+        table { width: 100%; border-collapse: collapse; background: white; margin-top: 20px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+        th { background: #007bff; color: white; }
+        button { width: 100%; padding: 12px; margin-top: 10px; cursor: pointer; font-weight: bold; border-radius: 5px; border: none; color: white; }
+        .btn-blue { background: #007bff; }
+        .btn-gray { background: #6c757d; }
+        .btn-green { background: #28a745; margin-top: 30px; }
+        input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        .stats { font-size: 24px; font-weight: bold; margin-bottom: 20px; color: #007bff; }
     </style>
 </head>
 <body>
 
-<header>
-    <h1>Attendance Dashboard</h1>
-    <div>System Online</div>
-</header>
-
-<div class="container">
     <div class="sidebar">
-        <div class="control-group">
-            <label>Class ID:</label>
-            <input type="text" id="classIdInput" value="cs101" onchange="refreshDashboard()">
+        <h3>Controls</h3>
+        <label>Class ID:</label>
+        <input type="text" id="classIdInput" value="cs101" onchange="refresh()">
+        
+        <div class="qr-box">
+            <img id="qrImage" src="" alt="QR Code">
+            <p style="font-size: 11px; color: #666;">Scan to mark present</p>
         </div>
 
-        <!-- QR Code Image (100% Reliable) -->
-        <div class="qr-area">
-            <img id="qrImage" src="" alt="Generating QR Code...">
-            <p style="font-size: 11px; color: #888; margin-top: 10px;">Scan to mark attendance</p>
-        </div>
-
-        <button style="background:#6c757d;" onclick="updateLocation()">Update Class Location</button>
-        <button class="btn-download" onclick="downloadCSV()">📊 Download List (CSV)</button>
+        <button class="btn-gray" onclick="updateLoc()">📍 Set Room GPS</button>
+        <button class="btn-green" onclick="downloadCSV()">📊 Download Excel (CSV)</button>
     </div>
 
-    <div class="main-content">
-        <div class="date-selector">
-            <label>Viewing Date:</label>
-            <input type="date" id="viewDate" onchange="refreshDashboard()">
-        </div>
+    <div class="main">
+        <div class="stats">Total Present: <span id="count">0</span></div>
+        
+        <label>Filter by Date:</label>
+        <input type="date" id="viewDate" style="width: 200px;" onchange="refresh()">
 
-        <h3>Total Present: <span id="count">0</span></h3>
         <table>
             <thead>
                 <tr>
@@ -74,104 +50,88 @@
                     <th>Index Number</th>
                 </tr>
             </thead>
-            <tbody id="attendanceList"></tbody>
+            <tbody id="list"></tbody>
         </table>
     </div>
-</div>
 
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    const firebaseConfig = {
-        apiKey: "AIzaSyC6TqpzjJNSJ5d2CCJl7WL4RrmyIvTk8DA",
-        authDomain: "qr-code-attendace.firebaseapp.com",
-        projectId: "qr-code-attendace",
-        storageBucket: "qr-code-attendace.firebasestorage.app",
-        messagingSenderId: "346712215800",
-        appId: "1:346712215800:web:0e2127df0ee4e2049c6b0d"
-    };
+        const firebaseConfig = {
+            apiKey: "AIzaSyC6TqpzjJNSJ5d2CCJl7WL4RrmyIvTk8DA",
+            authDomain: "qr-code-attendace.firebaseapp.com",
+            projectId: "qr-code-attendace",
+            storageBucket: "qr-code-attendace.firebasestorage.app",
+            messagingSenderId: "346712215800",
+            appId: "1:346712215800:web:0e2127df0ee4e2049c6b0d"
+        };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
-    // Set default date to Today
-    const now = new Date();
-    const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-    document.getElementById('viewDate').value = todayStr;
+        // Default to today
+        document.getElementById('viewDate').value = new Date().toISOString().split('T')[0];
 
-    window.refreshDashboard = () => {
-        const cid = document.getElementById('classIdInput').value;
-        const selectedDate = document.getElementById('viewDate').value;
-        
-        // Generate QR Code using a reliable API (it returns an image)
-        const studentUrl = `https://ygideon75-cpu.github.io/attendance-system/?class=${cid}`;
-        const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(studentUrl)}`;
-        
-        document.getElementById('qrImage').src = qrApiUrl;
-        
-        listenForAttendance(cid, selectedDate);
-    };
+        window.refresh = () => {
+            const cid = document.getElementById('classIdInput').value;
+            const url = `https://ygideon75-cpu.github.io/attendance-system/?class=${cid}`;
+            document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}`;
+            load(cid);
+        };
 
-    let unsub = null;
-    function listenForAttendance(cid, selectedDate) {
-        if(unsub) unsub();
+        let unsub = null;
+        function load(cid) {
+            if(unsub) unsub();
+            unsub = onSnapshot(query(collection(db, "attendance"), where("classId", "==", cid)), (snap) => {
+                const selectedDate = document.getElementById('viewDate').value;
+                const filtered = snap.docs.map(d => d.data()).filter(d => {
+                    if(!d.timestamp) return false;
+                    return d.timestamp.toDate().toISOString().split('T')[0] === selectedDate;
+                }).sort((a,b) => b.timestamp - a.timestamp);
 
-        const q = query(collection(db, "attendance"), where("classId", "==", cid));
-
-        unsub = onSnapshot(q, (snap) => {
-            const listBody = document.getElementById('attendanceList');
-            
-            const filteredData = snap.docs
-                .map(doc => doc.data())
-                .filter(data => {
-                    if (!data.timestamp) return false;
-                    const d = data.timestamp.toDate();
-                    const dStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-                    return dStr === selectedDate;
-                })
-                .sort((a, b) => b.timestamp - a.timestamp);
-
-            document.getElementById('count').innerText = filteredData.length;
-            listBody.innerHTML = filteredData.map(d => {
-                const time = d.timestamp.toDate().toLocaleTimeString();
-                return `<tr><td>${time}</td><td>${d.student}</td><td>${d.index}</td></tr>`;
-            }).join('');
-            
-            if (filteredData.length === 0) {
-                listBody.innerHTML = "<tr><td colspan='3' style='text-align:center;'>No records found for this date.</td></tr>";
-            }
-        });
-    }
-
-    window.downloadCSV = () => {
-        const cid = document.getElementById('classIdInput').value;
-        const date = document.getElementById('viewDate').value;
-        let csv = "Time,Name,Index\n";
-        document.querySelectorAll("#attendanceList tr").forEach(row => {
-            if (row.cells.length >= 3 && row.cells[0].innerText !== "No records found for this date.") {
-                csv += `"${row.cells[0].innerText}","${row.cells[1].innerText}","${row.cells[2].innerText}"\n`;
-            }
-        });
-        const link = document.createElement("a");
-        link.href = encodeURI("data:text/csv;charset=utf-8," + csv);
-        link.download = `Attendance_${cid}_${date}.csv`;
-        link.click();
-    };
-
-    window.updateLocation = () => {
-        const cid = document.getElementById('classIdInput').value;
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-            await updateDoc(doc(db, "classes", cid), { 
-                lat: pos.coords.latitude, 
-                lng: pos.coords.longitude 
+                document.getElementById('count').innerText = filtered.length;
+                document.getElementById('list').innerHTML = filtered.map(d => `
+                    <tr>
+                        <td>${d.timestamp.toDate().toLocaleTimeString()}</td>
+                        <td>${d.student}</td>
+                        <td>${d.index}</td>
+                    </tr>
+                `).join('') || "<tr><td colspan='3' style='text-align:center;'>No records for this date.</td></tr>";
             });
-            alert("Class location updated!");
-        }, (err) => alert("Error: Please enable GPS."));
-    };
+        }
 
-    // Initial Load
-    refreshDashboard();
-</script>
+        window.downloadCSV = () => {
+            const cid = document.getElementById('classIdInput').value;
+            const date = document.getElementById('viewDate').value;
+            let csv = "Time,Name,Index\n";
+            document.querySelectorAll("#list tr").forEach(tr => {
+                if (tr.cells.length >= 3) {
+                    csv += `"${tr.cells[0].innerText}","${tr.cells[1].innerText}","${tr.cells[2].innerText}"\n`;
+                }
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.setAttribute("download", `Attendance_${cid}_${date}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        window.updateLoc = () => {
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                await updateDoc(doc(db, "classes", document.getElementById('classIdInput').value), { 
+                    lat: pos.coords.latitude, 
+                    lng: pos.coords.longitude 
+                });
+                alert("Room GPS Updated!");
+            }, (err) => alert("Error: Please enable GPS."));
+        };
+
+        refresh();
+    </script>
 </body>
 </html>
