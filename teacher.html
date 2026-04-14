@@ -1,137 +1,41 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Teacher Dashboard</title>
-    <style>
-        body { font-family: sans-serif; background: #f4f4f9; margin: 0; display: flex; }
-        .sidebar { width: 280px; background: white; height: 100vh; padding: 20px; border-right: 1px solid #ddd; position: fixed; box-sizing: border-box; }
-        .main { margin-left: 280px; padding: 30px; flex-grow: 1; }
-        .qr-box { text-align: center; margin: 20px 0; padding: 10px; border: 1px solid #ddd; background: #fafafa; }
-        #qrImage { width: 180px; height: 180px; display: block; margin: 0 auto; }
-        table { width: 100%; border-collapse: collapse; background: white; margin-top: 20px; }
-        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
-        th { background: #007bff; color: white; }
-        button { width: 100%; padding: 12px; margin-top: 10px; cursor: pointer; font-weight: bold; border-radius: 5px; border: none; color: white; }
-        .btn-blue { background: #007bff; }
-        .btn-gray { background: #6c757d; }
-        .btn-green { background: #28a745; margin-top: 30px; }
-        input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-        .stats { font-size: 24px; font-weight: bold; margin-bottom: 20px; color: #007bff; }
-    </style>
-</head>
-<body>
+window.downloadCSV = () => {
+    const cid = document.getElementById('classIdInput').value;
+    const date = document.getElementById('viewDate').value;
+    
+    // 1. Create the CSV header
+    let csv = "Time,Name,Index\n";
+    
+    // 2. Get the data from the table
+    const rows = document.querySelectorAll("#attendanceList tr");
+    if (rows.length === 0 || (rows.length === 1 && rows[0].cells.length < 3)) {
+        alert("No data to download for this date.");
+        return;
+    }
 
-    <div class="sidebar">
-        <h3>Controls</h3>
-        <label>Class ID:</label>
-        <input type="text" id="classIdInput" value="cs101" onchange="refresh()">
-        
-        <div class="qr-box">
-            <img id="qrImage" src="" alt="QR Code">
-            <p style="font-size: 11px; color: #666;">Scan to mark present</p>
-        </div>
-
-        <button class="btn-gray" onclick="updateLoc()">📍 Set Room GPS</button>
-        <button class="btn-green" onclick="downloadCSV()">📊 Download Excel (CSV)</button>
-    </div>
-
-    <div class="main">
-        <div class="stats">Total Present: <span id="count">0</span></div>
-        
-        <label>Filter by Date:</label>
-        <input type="date" id="viewDate" style="width: 200px;" onchange="refresh()">
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Student Name</th>
-                    <th>Index Number</th>
-                </tr>
-            </thead>
-            <tbody id="list"></tbody>
-        </table>
-    </div>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyC6TqpzjJNSJ5d2CCJl7WL4RrmyIvTk8DA",
-            authDomain: "qr-code-attendace.firebaseapp.com",
-            projectId: "qr-code-attendace",
-            storageBucket: "qr-code-attendace.firebasestorage.app",
-            messagingSenderId: "346712215800",
-            appId: "1:346712215800:web:0e2127df0ee4e2049c6b0d"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        // Default to today
-        document.getElementById('viewDate').value = new Date().toISOString().split('T')[0];
-
-        window.refresh = () => {
-            const cid = document.getElementById('classIdInput').value;
-            const url = `https://ygideon75-cpu.github.io/attendance-system/?class=${cid}`;
-            document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}`;
-            load(cid);
-        };
-
-        let unsub = null;
-        function load(cid) {
-            if(unsub) unsub();
-            unsub = onSnapshot(query(collection(db, "attendance"), where("classId", "==", cid)), (snap) => {
-                const selectedDate = document.getElementById('viewDate').value;
-                const filtered = snap.docs.map(d => d.data()).filter(d => {
-                    if(!d.timestamp) return false;
-                    return d.timestamp.toDate().toISOString().split('T')[0] === selectedDate;
-                }).sort((a,b) => b.timestamp - a.timestamp);
-
-                document.getElementById('count').innerText = filtered.length;
-                document.getElementById('list').innerHTML = filtered.map(d => `
-                    <tr>
-                        <td>${d.timestamp.toDate().toLocaleTimeString()}</td>
-                        <td>${d.student}</td>
-                        <td>${d.index}</td>
-                    </tr>
-                `).join('') || "<tr><td colspan='3' style='text-align:center;'>No records for this date.</td></tr>";
-            });
+    rows.forEach(tr => {
+        if (tr.cells.length >= 3) {
+            // Clean the text to remove extra spaces or commas
+            const time = tr.cells[0].innerText.replace(/,/g, "");
+            const name = tr.cells[1].innerText.replace(/,/g, "");
+            const index = tr.cells[2].innerText.replace(/,/g, "");
+            csv += `${time},${name},${index}\n`;
         }
+    });
 
-        window.downloadCSV = () => {
-            const cid = document.getElementById('classIdInput').value;
-            const date = document.getElementById('viewDate').value;
-            let csv = "Time,Name,Index\n";
-            document.querySelectorAll("#list tr").forEach(tr => {
-                if (tr.cells.length >= 3) {
-                    csv += `"${tr.cells[0].innerText}","${tr.cells[1].innerText}","${tr.cells[2].innerText}"\n`;
-                }
-            });
-
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = url;
-            link.setAttribute("download", `Attendance_${cid}_${date}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        };
-
-        window.updateLoc = () => {
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-                await updateDoc(doc(db, "classes", document.getElementById('classIdInput').value), { 
-                    lat: pos.coords.latitude, 
-                    lng: pos.coords.longitude 
-                });
-                alert("Room GPS Updated!");
-            }, (err) => alert("Error: Please enable GPS."));
-        };
-
-        refresh();
-    </script>
-</body>
-</html>
+    // 3. Create a BLOB (This is the fix)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    // 4. Create a hidden link and click it
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Attendance_${cid}_${date}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up the temporary URL
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+};
