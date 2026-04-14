@@ -11,8 +11,8 @@
         input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 16px; }
         button { width: 100%; background: #007bff; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px; }
         button:disabled { background: #ccc; cursor: not-allowed; }
-        #status { margin-top: 15px; font-weight: bold; color: #666; font-size: 14px; min-height: 20px; }
-        .retry-btn { background: #6c757d; font-size: 12px; padding: 8px; margin-top: 5px; width: auto; }
+        .verify-btn { background: #28a745; margin-bottom: 10px; }
+        #status { margin-top: 15px; font-weight: bold; color: #666; font-size: 14px; }
         .success-msg { color: #28a745; font-weight: bold; margin-top: 20px; display: none; padding: 15px; background: #e6ffed; border-radius: 8px; border: 1px solid #28a745; }
     </style>
 </head>
@@ -24,10 +24,13 @@
             <input type="text" id="studentName" placeholder="Full Name">
             <input type="text" id="studentIndex" placeholder="Index Number">
             
-            <div id="status">Initializing GPS...</div>
-            <button id="retryBtn" class="retry-btn" style="display:none;" onclick="startGPS()">Retry GPS</button>
+            <div id="status">Enter details then verify location</div>
             
-            <button id="submitBtn" disabled onclick="submitAttendance()">Mark Present</button>
+            <!-- Step 1: Verify Location -->
+            <button id="verifyBtn" class="verify-btn" onclick="verifyLocation()">1. Verify My Location</button>
+            
+            <!-- Step 2: Mark Present (Hidden until verified) -->
+            <button id="submitBtn" style="display:none;" onclick="submitAttendance()">2. Mark Present</button>
         </div>
         <div id="successMsg" class="success-msg">✅ Attendance Marked Successfully!</div>
     </div>
@@ -58,31 +61,30 @@
                 if (snap.exists()) {
                     classData = snap.data();
                     document.getElementById('className').innerText = classData.name;
-                    startGPS();
                 } else {
                     document.getElementById('status').innerText = "Class not found.";
                 }
             } catch (e) { console.error(e); }
         }
 
-        window.startGPS = function() {
+        window.verifyLocation = function() {
             const statusDiv = document.getElementById('status');
-            const retryBtn = document.getElementById('retryBtn');
+            const verifyBtn = document.getElementById('verifyBtn');
             const submitBtn = document.getElementById('submitBtn');
 
-            statusDiv.innerText = "Detecting location...";
-            statusDiv.style.color = "#666";
-            retryBtn.style.display = "none";
+            statusDiv.innerText = "Checking GPS... please wait";
+            verifyBtn.disabled = true;
+            verifyBtn.innerText = "Searching...";
 
             if (!navigator.geolocation) {
                 statusDiv.innerText = "GPS not supported.";
                 return;
             }
 
-            // High Accuracy can be slow. We add a timeout of 10 seconds.
+            // We use a slightly more relaxed timeout and accuracy setting for speed
             const geoOptions = {
                 enableHighAccuracy: true, 
-                timeout: 10000, 
+                timeout: 8000, 
                 maximumAge: 0
             };
 
@@ -92,17 +94,18 @@
                 if (d <= classData.radius) {
                     statusDiv.innerText = "Location Verified ✅";
                     statusDiv.style.color = "green";
-                    submitBtn.disabled = false;
+                    verifyBtn.style.display = "none";
+                    submitBtn.style.display = "block";
                 } else {
                     statusDiv.innerText = "Too far from class (" + Math.round(d) + "m)";
                     statusDiv.style.color = "red";
-                    submitBtn.disabled = true;
-                    retryBtn.style.display = "inline-block";
+                    verifyBtn.disabled = false;
+                    verifyBtn.innerText = "Retry Verification";
                 }
             }, (err) => {
-                statusDiv.innerText = "GPS Error: " + err.message;
-                statusDiv.style.color = "red";
-                retryBtn.style.display = "inline-block";
+                statusDiv.innerText = "GPS Error: " + err.message + ". Try moving near a window.";
+                verifyBtn.disabled = false;
+                verifyBtn.innerText = "Retry Verification";
             }, geoOptions);
         }
 
@@ -125,7 +128,7 @@
 
             try {
                 document.getElementById('submitBtn').disabled = true;
-                document.getElementById('submitBtn').innerText = "Checking...";
+                document.getElementById('submitBtn').innerText = "Saving...";
 
                 const lockRef = doc(db, "locks", lockID);
                 const lockSnap = await getDoc(lockRef);
@@ -148,7 +151,6 @@
             } catch (e) { 
                 alert(e.message); 
                 document.getElementById('submitBtn').disabled = false;
-                document.getElementById('submitBtn').innerText = "Mark Present";
             }
         };
 
