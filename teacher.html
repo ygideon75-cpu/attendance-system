@@ -13,42 +13,37 @@
         th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
         th { background: #007bff; color: white; }
         button { width: 100%; padding: 12px; margin-top: 10px; cursor: pointer; font-weight: bold; border-radius: 5px; border: none; color: white; }
-        .btn-blue { background: #007bff; }
         .btn-gray { background: #6c757d; }
-        .btn-green { background: #28a745; margin-top: 30px; }
+        .btn-green { background: #28a745; }
+        .btn-orange { background: #fd7e14; margin-top: 5px; }
         input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
         .stats { font-size: 24px; font-weight: bold; margin-bottom: 20px; color: #007bff; }
     </style>
 </head>
 <body>
-
     <div class="sidebar">
         <h3>Controls</h3>
         <label>Class ID:</label>
         <input type="text" id="classIdInput" value="cs101" onchange="refresh()">
-        
         <div class="qr-box">
             <img id="qrImage" src="" alt="QR Code">
-            <p style="font-size: 11px; color: #666;">Scan to mark present</p>
         </div>
-
         <button class="btn-gray" onclick="updateLoc()">📍 Set Room GPS</button>
-        <button class="btn-green" onclick="downloadCSV()">📊 Download Excel (CSV)</button>
+        
+        <hr style="margin: 20px 0;">
+        
+        <button class="btn-green" onclick="downloadCSV()">📊 Download CSV</button>
+        <button class="btn-orange" onclick="copyToClipboard()">📋 Copy for Excel</button>
+        <p style="font-size: 11px; color: #666; text-align: center; margin-top: 5px;">Use "Copy" if Download fails</p>
     </div>
 
     <div class="main">
         <div class="stats">Total Present: <span id="count">0</span></div>
-        
         <label>Filter by Date:</label>
         <input type="date" id="viewDate" style="width: 200px;" onchange="refresh()">
-
         <table>
             <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Student Name</th>
-                    <th>Index Number</th>
-                </tr>
+                <tr><th>Time</th><th>Student Name</th><th>Index Number</th></tr>
             </thead>
             <tbody id="list"></tbody>
         </table>
@@ -69,8 +64,6 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-
-        // Default to today
         document.getElementById('viewDate').value = new Date().toISOString().split('T')[0];
 
         window.refresh = () => {
@@ -89,48 +82,46 @@
                     if(!d.timestamp) return false;
                     return d.timestamp.toDate().toISOString().split('T')[0] === selectedDate;
                 }).sort((a,b) => b.timestamp - a.timestamp);
-
                 document.getElementById('count').innerText = filtered.length;
-                document.getElementById('list').innerHTML = filtered.map(d => `
-                    <tr>
-                        <td>${d.timestamp.toDate().toLocaleTimeString()}</td>
-                        <td>${d.student}</td>
-                        <td>${d.index}</td>
-                    </tr>
-                `).join('') || "<tr><td colspan='3' style='text-align:center;'>No records for this date.</td></tr>";
+                document.getElementById('list').innerHTML = filtered.map(d => `<tr><td>${d.timestamp.toDate().toLocaleTimeString()}</td><td>${d.student}</td><td>${d.index}</td></tr>`).join('') || "<tr><td colspan='3' style='text-align:center;'>No records.</td></tr>";
             });
         }
 
-        window.downloadCSV = () => {
-            const cid = document.getElementById('classIdInput').value;
-            const date = document.getElementById('viewDate').value;
-            let csv = "Time,Name,Index\n";
+        function getCSVData() {
+            let csv = "Time\tName\tIndex\n"; // Using Tabs for easier Excel pasting
             document.querySelectorAll("#list tr").forEach(tr => {
                 if (tr.cells.length >= 3) {
-                    csv += `"${tr.cells[0].innerText}","${tr.cells[1].innerText}","${tr.cells[2].innerText}"\n`;
+                    csv += `${tr.cells[0].innerText}\t${tr.cells[1].innerText}\t${tr.cells[2].innerText}\n`;
                 }
             });
+            return csv;
+        }
 
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = url;
-            link.setAttribute("download", `Attendance_${cid}_${date}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+        window.downloadCSV = () => {
+            const csv = getCSVData().replace(/\t/g, ","); // Change tabs to commas for CSV file
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "attendance.csv";
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+        };
+
+        window.copyToClipboard = () => {
+            const data = getCSVData();
+            navigator.clipboard.writeText(data).then(() => {
+                alert("Table copied! Open Excel and press Ctrl+V to paste.");
+            });
         };
 
         window.updateLoc = () => {
             navigator.geolocation.getCurrentPosition(async (pos) => {
-                await updateDoc(doc(db, "classes", document.getElementById('classIdInput').value), { 
-                    lat: pos.coords.latitude, 
-                    lng: pos.coords.longitude 
-                });
-                alert("Room GPS Updated!");
-            }, (err) => alert("Error: Please enable GPS."));
+                await updateDoc(doc(db, "classes", document.getElementById('classIdInput').value), { lat: pos.coords.latitude, lng: pos.coords.longitude });
+                alert("GPS Updated!");
+            });
         };
-
         refresh();
     </script>
 </body>
