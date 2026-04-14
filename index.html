@@ -12,34 +12,164 @@
         .subtitle { color: #333; margin-bottom: 25px; font-size: 16px; }
         
         input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; color: #333; }
-        input::placeholder { color: #aaa; }
-
-        #status { margin-top: 20px; font-weight: bold; font-size: 18px; color: #666; min-height: 24px; }
         
-        button { width: 100%; background: #1a73e8; color: white; border: none; padding: 15px; border-radius: 8px; cursor: pointer; font-size: 18px; font-weight: bold; margin-top: 10px; transition: 0.3s; }
+        #status { margin-top: 20px; font-weight: bold; font-size: 16px; color: #666; min-height: 24px; line-height: 1.4; }
+        
+        button { width: 100%; background: #1a73e8; color: white; border: none; padding: 15px; border-radius: 8px; cursor: pointer; font-size: 18px; font-weight: bold; margin-top: 10px; }
         button:disabled { background: #ccc; cursor: not-allowed; }
         
+        .start-btn { background: #28a745; margin-top: 20px; }
         .success-state { display: none; }
-        .success-icon { font-size: 50px; color: #28a745; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <!-- FORM UI -->
         <div id="formUI">
-            <h2 id="className">Loading...</h2>
-            <p class="subtitle">Enter your details to register</p>
+            <h2 id="className">Class Attendance</h2>
+            <p class="subtitle">Enter your details to mark attendance</p>
             
             <input type="text" id="studentName" placeholder="Full Name">
             <input type="text" id="studentIndex" placeholder="Index Number">
 
-            <div id="status">Detecting Location...</div>
+            <div id="status">Click the button below to verify your location</div>
             
-            <button id="submitBtn" disabled onclick="submitAttendance()">Mark Present</button>
+            <!-- This button wakes up the GPS -->
+            <button id="startBtn" class="start-btn" onclick="startGPS()">Step 1: Verify Location</button>
+            
+            <!-- This button saves the data -->
+            <button id="submitBtn" style="display:none;" onclick="submitAttendance()">Step 2: Mark Present</button>
         </div>
 
-        <!-- SUCCESS UI -->
         <div id="successUI" class="success-state">
-            <div class="success-icon">✅</div>
-            <h2 style="color: #28a745;">Suc
+            <h2 style="color: #28a745;">✅ Success!</h2>
+            <p class="subtitle">Your attendance has been recorded.</p>
+            <button onclick="location.reload()" style="background: #f1f5f9; color: #475569;">Submit Another</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, doc, getDoc, addDoc, collection, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyC6TqpzjJNSJ5d2CCJl7WL4RrmyIvTk8DA",
+            authDomain: "qr-code-attendace.firebaseapp.com",
+            projectId: "qr-code-attendace",
+            storageBucket: "qr-code-attendace.firebasestorage.app",
+            messagingSenderId: "346712215800",
+            appId: "1:346712215800:web:0e2127df0ee4e2049c6b0d"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const urlParams = new URLSearchParams(window.location.search);
+        const classId = urlParams.get('class') || "cs101"; 
+        let classData = null;
+
+        // 1. Load Class Name immediately
+        async function init() {
+            try {
+                const docRef = doc(db, "classes", classId);
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    classData = snap.data();
+                    document.getElementById('className').innerText = classData.name;
+                } else {
+                    document.getElementById('status').innerText = "❌ Error: Class ID '" + classId + "' not found in database.";
+                }
+            } catch (e) {
+                document.getElementById('status').innerText = "❌ Connection Error. Check your internet.";
+            }
+        }
+
+        // 2. GPS Logic (Triggered by user click)
+        window.startGPS = function() {
+            const statusDiv = document.getElementById('status');
+            const startBtn = document.getElementById('startBtn');
+            
+            statusDiv.innerText = "Detecting location... please wait.";
+            startBtn.disabled = true;
+            startBtn.innerText = "Searching...";
+
+            if (!navigator.geolocation) {
+                statusDiv.innerText = "GPS not supported on this device.";
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition((pos) => {
+                if(!classData) {
+                    statusDiv.innerText = "Still loading class data...";
+                    startBtn.disabled = false;
+                    return;
+                }
+
+                const d = calculateDistance(pos.coords.latitude, pos.coords.longitude, classData.lat, classData.lng);
+                
+                if (d <= classData.radius) {
+                    statusDiv.innerText = "Location Verified ✅";
+                    statusDiv.style.color = "#28a745";
+                    startBtn.style.display = "none";
+                    document.getElementById('submitBtn').style.display = "block";
+                } else {
+                    statusDiv.innerText = "Too far from class! (" + Math.round(d) + "m away)";
+                    statusDiv.style.color = "#dc3545";
+                    startBtn.disabled = false;
+                    startBtn.innerText = "Retry Verification";
+                }
+            }, (err) => {
+                statusDiv.innerText = "GPS Error: Please allow location access in your browser settings.";
+                startBtn.disabled = false;
+                startBtn.innerText = "Retry Verification";
+            }, {enableHighAccuracy: true, timeout: 10000});
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const dLat = (lat2-lat1) * Math.PI/180;
+            const dLon = (lon2-lon1) * Math.PI/180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        window.submitAttendance = async () => {
+            const name = document.getElementById('studentName').value.trim();
+            const index = document.getElementById('studentIndex').value.trim();
+            if(!name || !index) return alert("Please enter Name and Index");
+
+            const safeIndex = index.replace(/\//g, "-");
+            const today = new Date().toISOString().split('T')[0];
+            const lockID = `${today}_${classId}_${safeIndex}`;
+
+            try {
+                document.getElementById('submitBtn').disabled = true;
+                document.getElementById('submitBtn').innerText = "Saving...";
+
+                const lockRef = doc(db, "locks", lockID);
+                const lockSnap = await getDoc(lockRef);
+                if (lockSnap.exists()) {
+                    alert("You have already marked attendance today!");
+                    location.reload();
+                    return;
+                }
+
+                await setDoc(lockRef, { used: true });
+                await addDoc(collection(db, "attendance"), {
+                    student: name,
+                    index: index,
+                    classId: classId,
+                    timestamp: serverTimestamp()
+                });
+
+                document.getElementById('formUI').style.display = 'none';
+                document.getElementById('successUI').style.display = 'block';
+            } catch (e) { 
+                alert("Error: " + e.message); 
+                document.getElementById('submitBtn').disabled = false;
+            }
+        };
+
+        init();
+    </script>
+</body>
+</html>
