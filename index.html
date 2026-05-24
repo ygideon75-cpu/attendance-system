@@ -1,47 +1,74 @@
-<script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mark Attendance</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f1f5f9; }
+        .card { background: white; padding: 2rem; border-radius: 1rem; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 90%; max-width: 400px; text-align: center; }
+        input { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 0.5rem; box-sizing: border-box; font-size: 1rem; }
+        button { width: 100%; padding: 1rem; border: none; border-radius: 0.5rem; background: #007bff; color: white; font-weight: bold; cursor: pointer; font-size: 1rem; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        #status { font-size: 0.8rem; margin-top: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2 id="title">Class: Loading...</h2>
+        <input type="text" id="name" placeholder="Full Name">
+        <input type="text" id="index" placeholder="Index Number">
+        <div id="status">⏳ Detecting Location...</div>
+        <button id="btn" onclick="submitAttendance()" disabled>Mark Present</button>
+    </div>
 
-    const supabase = createClient('https://tnscsgqogoqrwdohytki.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc2NzZ3FvZ29xcndkb2h5dGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MTcwMjQsImV4cCI6MjA5NTE5MzAyNH0.Xy-QKWBrYXIMP7M_lBmW4SnUxlBpnbm_Poatd8W5Ph4');
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
 
-    const params = new URLSearchParams(window.location.search);
-    const classId = params.get('class') || 'cs101';
-    document.getElementById('title').innerText = "Class: " + classId.toUpperCase();
+        const supabase = createClient('https://tnscsgqogoqrwdohytki.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc2NzZ3FvZ29xcndkb2h5dGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MTcwMjQsImV4cCI6MjA5NTE5MzAyNH0.Xy-QKWBrYXIMP7M_lBmW4SnUxlBpnbm_Poatd8W5Ph4');
 
-    let studentLat = null;
-    let studentLng = null;
+        const params = new URLSearchParams(window.location.search);
+        const classId = params.get('class') || 'cs101';
+        document.getElementById('title').innerText = "Class: " + classId.toUpperCase();
 
-    // Get location as soon as page loads
-    navigator.geolocation.getCurrentPosition((pos) => {
-        studentLat = pos.coords.latitude;
-        studentLng = pos.coords.longitude;
-    }, (err) => {
-        alert("Please enable GPS/Location to mark attendance.");
-    });
+        let lat = null, lng = null;
 
-    window.submitAttendance = async () => {
-        const name = document.getElementById('name').value;
-        const index = document.getElementById('index').value;
-        const btn = document.getElementById('btn');
+        // Detect GPS Location
+        navigator.geolocation.getCurrentPosition((pos) => {
+            lat = pos.coords.latitude;
+            lng = pos.coords.longitude;
+            document.getElementById('status').innerText = "📍 Location Detected";
+            document.getElementById('status').style.color = "green";
+            document.getElementById('btn').disabled = false;
+        }, (err) => {
+            document.getElementById('status').innerText = "❌ Please enable GPS to mark attendance";
+            document.getElementById('status').style.color = "red";
+        }, { enableHighAccuracy: true });
 
-        if(!name || !index) return alert("Please fill all fields");
-        if(!studentLat) return alert("Still detecting location... please wait a second.");
+        window.submitAttendance = async () => {
+            const name = document.getElementById('name').value;
+            const index = document.getElementById('index').value;
+            if(!name || !index) return alert("Fill all fields");
 
-        btn.disabled = true;
-        btn.innerText = "Saving...";
+            document.getElementById('btn').innerText = "Saving...";
+            document.getElementById('btn').disabled = true;
 
-        const { error } = await supabase.from('attendance').insert([{
-            student: name,
-            index_number: index,
-            class_id: classId,
-            lat: studentLat, // Saves student Latitude
-            lng: studentLng  // Saves student Longitude
-        }]);
+            const { error } = await supabase.from('attendance').insert([{
+                student: name,
+                index_number: index,
+                class_id: classId,
+                lat: lat,
+                lng: lng
+            }]);
 
-        if (error) {
-            alert("Error: " + error.message);
-            btn.disabled = false;
-        } else {
-            document.body.innerHTML = "<h1>✅ Success! Attendance marked with GPS.</h1>";
-        }
-    };
-</script>
+            if (error) {
+                alert("Error: " + error.message);
+                document.getElementById('btn').disabled = false;
+                document.getElementById('btn').innerText = "Mark Present";
+            } else {
+                document.body.innerHTML = "<h2 style='text-align:center; margin-top:50px;'>✅ Done! Attendance recorded.</h2>";
+            }
+        };
+    </script>
+</body>
+</html>
