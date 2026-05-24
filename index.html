@@ -9,7 +9,7 @@
         .card { background: white; padding: 2.5rem; border-radius: 1.5rem; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 90%; max-width: 400px; text-align: center; }
         h2 { color: #1e293b; margin-top: 0; }
         input { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; box-sizing: border-box; font-size: 1rem; }
-        button { width: 100%; padding: 1rem; border: none; border-radius: 0.5rem; background: #007bff; color: white; font-weight: bold; cursor: pointer; font-size: 1rem; }
+        button { width: 100%; padding: 1rem; border: none; border-radius: 0.5rem; background: #007bff; color: white; font-weight: bold; cursor: pointer; font-size: 1rem; transition: 0.3s; }
         button:disabled { background: #cbd5e1; cursor: not-allowed; }
         #status { font-size: 0.85rem; margin-top: 15px; font-weight: 600; color: #64748b; }
     </style>
@@ -19,17 +19,103 @@
         <h2 id="title">Class: Loading...</h2>
         <input type="text" id="name" placeholder="Full Name">
         <input type="text" id="index" placeholder="Index Number">
-        <div id="status">⏳ Initializing...</div>
+        <div id="status">⏳ Detecting Location...</div>
         <button id="btn" onclick="submitAttendance()" disabled>Mark Present</button>
     </div>
 
     <script type="module">
-        // 1. UPDATE TITLE IMMEDIATELY (Before anything else)
-        const params = new URLSearchParams(window.location.search);
-        const classId = params.get('class') || 'cs101';
-        document.getElementById('title').innerText = "Class: " + classId.toUpperCase();
-        document.getElementById('status').innerText = "⏳ Detecting Location...";
-
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
 
-        const supabase = createClient('https://tnscsgqogoqrwdohytki.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3Mi
+        const supabase = createClient('https://tnscsgqogoqrwdohytki.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc2NzZ3FvZ29xcndkb2h5dGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MTcwMjQsImV4cCI6MjA5NTE5MzAyNH0.Xy-QKWBrYXIMP7M_lBmW4SnUxlBpnbm_Poatd8W5Ph4');
+
+        const params = new URLSearchParams(window.location.search);
+        const classId = params.get('class') || 'cs101';
+        const today = new Date().toISOString().split('T')[0];
+        
+        document.getElementById('title').innerText = "Class: " + classId.toUpperCase();
+
+        // 1. DEVICE LOCK: Has this phone scanned for this class today?
+        if (localStorage.getItem('attendance_' + classId) === today) {
+            document.getElementById('mainCard').innerHTML = "<h2>✅ Already Marked</h2><p>You have already recorded your attendance today.</p>";
+        }
+
+        let studentLat = null, studentLng = null;
+
+        // 2. GPS GEOFENCING (100m Range)
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            studentLat = pos.coords.latitude;
+            studentLng = pos.coords.longitude;
+
+            const { data: classData } = await supabase.from('classes').select('*').eq('id', classId).single();
+
+            if (classData && classData.lat) {
+                const distance = getDistance(studentLat, studentLng, classData.lat, classData.lng);
+                const meters = Math.round(distance * 1000);
+                
+                if (distance > 0.1) { // 0.1 km = 100 meters
+                    document.getElementById('status').innerText = `❌ Too far from class (${meters}m away)`;
+                    document.getElementById('status').style.color = "#dc2626";
+                } else {
+                    document.getElementById('status').innerText = `📍 Location Verified (${meters}m away)`;
+                    document.getElementById('status').style.color = "#16a34a";
+                    document.getElementById('btn').disabled = false;
+                }
+            } else {
+                document.getElementById('status').innerText = "⚠️ Room location not set by teacher.";
+                document.getElementById('btn').disabled = false;
+            }
+        }, (err) => {
+            document.getElementById('status').innerText = "❌ Please enable GPS to continue";
+            document.getElementById('status').style.color = "#dc2626";
+        }, { enableHighAccuracy: true });
+
+        // Helper: Calculate distance in KM
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; 
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        window.submitAttendance = async () => {
+            const name = document.getElementById('name').value;
+            const index = document.getElementById('index').value;
+            if(!name || !index) return alert("Please fill all fields");
+
+            const btn = document.getElementById('btn');
+            btn.innerText = "Checking...";
+            btn.disabled = true;
+
+            // 3. DATABASE DUPLICATE CHECK (One index per class per day)
+            const startOfDay = `${today}T00:00:00.000Z`;
+            const { data: existing } = await supabase
+                .from('attendance')
+                .select('id')
+                .eq('index_number', index)
+                .eq('class_id', classId)
+                .gte('created_at', startOfDay);
+
+            if (existing && existing.length > 0) {
+                alert("This Index Number has already been used today!");
+                btn.innerText = "Mark Present";
+                btn.disabled = false;
+                return;
+            }
+
+            // Save to DB
+            const { error } = await supabase.from('attendance').insert([{
+                student: name, index_number: index, class_id: classId, lat: studentLat, lng: studentLng
+            }]);
+
+            if (!error) {
+                localStorage.setItem('attendance_' + classId, today); // Lock phone
+                document.getElementById('mainCard').innerHTML = "<h2>✅ Success!</h2><p>Attendance recorded successfully.</p>";
+            } else {
+                alert("Error: " + error.message);
+                btn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>
