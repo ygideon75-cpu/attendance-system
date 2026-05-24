@@ -14,7 +14,7 @@
     </style>
 </head>
 <body>
-    <div class="card">
+    <div class="card" id="mainCard">
         <h2 id="title">Class: Loading...</h2>
         <input type="text" id="name" placeholder="Full Name">
         <input type="text" id="index" placeholder="Index Number">
@@ -29,44 +29,79 @@
 
         const params = new URLSearchParams(window.location.search);
         const classId = params.get('class') || 'cs101';
+        const today = new Date().toISOString().split('T')[0];
+        
         document.getElementById('title').innerText = "Class: " + classId.toUpperCase();
 
-        let lat = null, lng = null;
+        // 1. DEVICE LOCK CHECK: Has this phone already marked attendance today?
+        if (localStorage.getItem('attendance_' + classId) === today) {
+            document.getElementById('mainCard').innerHTML = "<h2>✅ Already Marked</h2><p>You have already recorded your attendance for this class today.</p>";
+        }
 
-        // Detect GPS Location
-        navigator.geolocation.getCurrentPosition((pos) => {
-            lat = pos.coords.latitude;
-            lng = pos.coords.longitude;
-            document.getElementById('status').innerText = "📍 Location Detected";
-            document.getElementById('status').style.color = "green";
-            document.getElementById('btn').disabled = false;
+        let studentLat = null, studentLng = null;
+
+        // 2. GPS GEOFENCING: Compare student location with Room GPS
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            studentLat = pos.coords.latitude;
+            studentLng = pos.coords.longitude;
+
+            // Fetch Teacher's Room Location from DB
+            const { data: classData } = await supabase.from('classes').select('*').eq('id', classId).single();
+
+            if (classData && classData.lat) {
+                const distance = getDistance(studentLat, studentLng, classData.lat, classData.lng);
+                
+                if (distance > 0.05) { // 0.05 km = 50 meters
+                    document.getElementById('status').innerText = "❌ Too far from classroom (" + Math.round(distance * 1000) + "m)";
+                    document.getElementById('status').style.color = "red";
+                } else {
+                    document.getElementById('status').innerText = "📍 Location Verified (In Room)";
+                    document.getElementById('status').style.color = "green";
+                    document.getElementById('btn').disabled = false;
+                }
+            } else {
+                document.getElementById('status').innerText = "⚠️ Room GPS not set by teacher.";
+                document.getElementById('btn').disabled = false; // Allow if teacher hasn't set location
+            }
         }, (err) => {
             document.getElementById('status').innerText = "❌ Please enable GPS to mark attendance";
-            document.getElementById('status').style.color = "red";
         }, { enableHighAccuracy: true });
+
+        // Helper function to calculate distance in KM
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; 
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
 
         window.submitAttendance = async () => {
             const name = document.getElementById('name').value;
             const index = document.getElementById('index').value;
             if(!name || !index) return alert("Fill all fields");
 
-            document.getElementById('btn').innerText = "Saving...";
-            document.getElementById('btn').disabled = true;
+            // 3. DATABASE DUPLICATE CHECK: Has this Index Number already been used today?
+            const startOfDay = `${today}T00:00:00.000Z`;
+            const { data: existing } = await supabase
+                .from('attendance')
+                .select('id')
+                .eq('index_number', index)
+                .eq('class_id', classId)
+                .gte('created_at', startOfDay);
+
+            if (existing && existing.length > 0) {
+                alert("This Index Number has already marked attendance today!");
+                return;
+            }
 
             const { error } = await supabase.from('attendance').insert([{
-                student: name,
-                index_number: index,
-                class_id: classId,
-                lat: lat,
-                lng: lng
+                student: name, index_number: index, class_id: classId, lat: studentLat, lng: studentLng
             }]);
 
-            if (error) {
-                alert("Error: " + error.message);
-                document.getElementById('btn').disabled = false;
-                document.getElementById('btn').innerText = "Mark Present";
-            } else {
-                document.body.innerHTML = "<h2 style='text-align:center; margin-top:50px;'>✅ Done! Attendance recorded.</h2>";
+            if (!error) {
+                localStorage.setItem('attendance_' + classId, today); // Lock the phone
+                document.body.innerHTML = "<h2>✅ Attendance Recorded!</h2>";
             }
         };
     </script>
