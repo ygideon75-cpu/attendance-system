@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mark Attendance</title>
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f1f5f9; }
-        .card { background: white; padding: 2rem; border-radius: 1rem; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 90%; max-width: 400px; text-align: center; }
-        input { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 0.5rem; box-sizing: border-box; font-size: 1rem; }
-        button { width: 100%; padding: 1rem; border: none; border-radius: 0.5rem; background: #007bff; color: white; font-weight: bold; cursor: pointer; font-size: 1rem; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        #status { font-size: 0.8rem; margin-top: 10px; font-weight: bold; }
+        body { font-family: -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f1f5f9; }
+        .card { background: white; padding: 2.5rem; border-radius: 1.5rem; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 90%; max-width: 400px; text-align: center; }
+        h2 { color: #1e293b; margin-top: 0; }
+        input { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; box-sizing: border-box; font-size: 1rem; }
+        button { width: 100%; padding: 1rem; border: none; border-radius: 0.5rem; background: #007bff; color: white; font-weight: bold; cursor: pointer; font-size: 1rem; transition: 0.3s; }
+        button:disabled { background: #cbd5e1; cursor: not-allowed; }
+        #status { font-size: 0.85rem; margin-top: 15px; font-weight: 600; color: #64748b; }
     </style>
 </head>
 <body>
@@ -33,77 +34,42 @@
         
         document.getElementById('title').innerText = "Class: " + classId.toUpperCase();
 
-        // 1. DEVICE LOCK CHECK: Has this phone already marked attendance today?
+        // 1. DEVICE LOCK: Has this phone scanned for this class today?
         if (localStorage.getItem('attendance_' + classId) === today) {
-            document.getElementById('mainCard').innerHTML = "<h2>✅ Already Marked</h2><p>You have already recorded your attendance for this class today.</p>";
+            document.getElementById('mainCard').innerHTML = "<h2>✅ Already Marked</h2><p>You have already recorded your attendance today.</p>";
         }
 
         let studentLat = null, studentLng = null;
 
-        // 2. GPS GEOFENCING: Compare student location with Room GPS
+        // 2. GPS GEOFENCING (100m Range)
         navigator.geolocation.getCurrentPosition(async (pos) => {
             studentLat = pos.coords.latitude;
             studentLng = pos.coords.longitude;
 
-            // Fetch Teacher's Room Location from DB
             const { data: classData } = await supabase.from('classes').select('*').eq('id', classId).single();
 
             if (classData && classData.lat) {
                 const distance = getDistance(studentLat, studentLng, classData.lat, classData.lng);
+                const meters = Math.round(distance * 1000);
                 
-                if (distance > 0.05) { // 0.05 km = 50 meters
-                    document.getElementById('status').innerText = "❌ Too far from classroom (" + Math.round(distance * 1000) + "m)";
-                    document.getElementById('status').style.color = "red";
+                if (distance > 0.1) { // 0.1 km = 100 meters
+                    document.getElementById('status').innerText = `❌ Too far from class (${meters}m away)`;
+                    document.getElementById('status').style.color = "#dc2626";
                 } else {
-                    document.getElementById('status').innerText = "📍 Location Verified (In Room)";
-                    document.getElementById('status').style.color = "green";
+                    document.getElementById('status').innerText = `📍 Location Verified (${meters}m away)`;
+                    document.getElementById('status').style.color = "#16a34a";
                     document.getElementById('btn').disabled = false;
                 }
             } else {
-                document.getElementById('status').innerText = "⚠️ Room GPS not set by teacher.";
-                document.getElementById('btn').disabled = false; // Allow if teacher hasn't set location
+                document.getElementById('status').innerText = "⚠️ Room location not set by teacher.";
+                document.getElementById('btn').disabled = false;
             }
         }, (err) => {
-            document.getElementById('status').innerText = "❌ Please enable GPS to mark attendance";
+            document.getElementById('status').innerText = "❌ Please enable GPS to continue";
+            document.getElementById('status').style.color = "#dc2626";
         }, { enableHighAccuracy: true });
 
-        // Helper function to calculate distance in KM
+        // Helper: Calculate distance in KM
         function getDistance(lat1, lon1, lat2, lon2) {
             const R = 6371; 
             const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
-
-        window.submitAttendance = async () => {
-            const name = document.getElementById('name').value;
-            const index = document.getElementById('index').value;
-            if(!name || !index) return alert("Fill all fields");
-
-            // 3. DATABASE DUPLICATE CHECK: Has this Index Number already been used today?
-            const startOfDay = `${today}T00:00:00.000Z`;
-            const { data: existing } = await supabase
-                .from('attendance')
-                .select('id')
-                .eq('index_number', index)
-                .eq('class_id', classId)
-                .gte('created_at', startOfDay);
-
-            if (existing && existing.length > 0) {
-                alert("This Index Number has already marked attendance today!");
-                return;
-            }
-
-            const { error } = await supabase.from('attendance').insert([{
-                student: name, index_number: index, class_id: classId, lat: studentLat, lng: studentLng
-            }]);
-
-            if (!error) {
-                localStorage.setItem('attendance_' + classId, today); // Lock the phone
-                document.body.innerHTML = "<h2>✅ Attendance Recorded!</h2>";
-            }
-        };
-    </script>
-</body>
-</html>
