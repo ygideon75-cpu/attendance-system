@@ -15,15 +15,21 @@
         .btn-blue { background: #007bff; }
         .btn-green { background: #28a745; }
         .map-link { color: #007bff; text-decoration: none; font-weight: bold; font-size: 12px; }
+        label { font-size: 11px; font-weight: bold; color: #64748b; margin-top: 15px; display: block; }
+        input { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
     </style>
 </head>
 <body>
     <div class="sidebar">
         <h2>Dashboard</h2>
-        <label>CLASS ID</label>
-        <input type="text" id="classIdInput" value="cs101" onchange="refresh()" style="width:100%; padding:10px; margin-bottom:20px; box-sizing: border-box;">
         
-        <img id="qrImage" style="width:100%; margin-bottom:20px;">
+        <label>CLASS ID</label>
+        <input type="text" id="classIdInput" value="cs101" onchange="refresh()">
+
+        <label>FILTER BY DATE</label>
+        <input type="date" id="dateFilter" onchange="refresh()">
+        
+        <img id="qrImage" style="width:100%; margin-bottom:20px; border: 1px solid #eee;">
         
         <button class="btn btn-blue" onclick="updateRoomGPS()">📍 Set Room GPS</button>
         <button class="btn btn-green" onclick="downloadCSV()">📥 Download CSV</button>
@@ -41,14 +47,32 @@
 
     <script type="module">
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+        
         const supabase = createClient('https://tnscsgqogoqrwdohytki.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc2NzZ3FvZ29xcndkb2h5dGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MTcwMjQsImV4cCI6MjA5NTE5MzAyNH0.Xy-QKWBrYXIMP7M_lBmW4SnUxlBpnbm_Poatd8W5Ph4');
+
+        // Set the default date to Today
+        document.getElementById('dateFilter').value = new Date().toISOString().split('T')[0];
 
         window.refresh = async () => {
             const cid = document.getElementById('classIdInput').value;
+            const selectedDate = document.getElementById('dateFilter').value;
+            
+            // Update QR Code
             const url = `https://ygideon75-cpu.github.io/attendance-system/?class=${cid}`;
             document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(url)}`;
             
-            const { data } = await supabase.from('attendance').select('*').eq('class_id', cid).order('created_at', { ascending: false });
+            // Create range for the selected day (From 00:00:00 to 23:59:59)
+            const startOfDay = `${selectedDate}T00:00:00.000Z`;
+            const endOfDay = `${selectedDate}T23:59:59.999Z`;
+
+            const { data, error } = await supabase
+                .from('attendance')
+                .select('*')
+                .eq('class_id', cid)
+                .gte('created_at', startOfDay)
+                .lte('created_at', endOfDay)
+                .order('created_at', { ascending: false });
+
             if (data) {
                 document.getElementById('count').innerText = data.length;
                 document.getElementById('list').innerHTML = data.map(d => `
@@ -58,12 +82,16 @@
                         <td>${d.index_number}</td>
                         <td><a href="https://www.google.com/maps?q=${d.lat},${d.lng}" target="_blank" class="map-link">📍 View Map</a></td>
                     </tr>
-                `).join('') || "<tr><td colspan='4'>No records found</td></tr>";
+                `).join('') || "<tr><td colspan='4' style='text-align:center; padding:20px;'>No records for this date.</td></tr>";
             }
         };
 
-        // Instant Real-time Update
-        supabase.channel('db').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attendance' }, () => refresh()).subscribe();
+        // Real-time Update (Only refreshes if the date is set to "Today")
+        supabase.channel('db').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attendance' }, (payload) => {
+            const today = new Date().toISOString().split('T')[0];
+            const currentFilter = document.getElementById('dateFilter').value;
+            if (today === currentFilter) refresh();
+        }).subscribe();
 
         window.updateRoomGPS = () => {
             const cid = document.getElementById('classIdInput').value;
@@ -74,14 +102,19 @@
         };
 
         window.downloadCSV = () => {
-            let csv = "Time,Student,Index,Lat,Lng\n";
+            const date = document.getElementById('dateFilter').value;
+            let csv = "Time,Student,Index,Latitude,Longitude\n";
             document.querySelectorAll("#list tr").forEach(tr => {
-                if(tr.cells.length > 1) csv += `${tr.cells[0].innerText},${tr.cells[1].innerText},${tr.cells[2].innerText}\n`;
+                if(tr.cells.length > 1) {
+                    // Extract text and remove commas to avoid CSV errors
+                    const row = Array.from(tr.cells).map(cell => cell.innerText.replace(',', '')).join(',');
+                    csv += row + "\n";
+                }
             });
             const blob = new Blob([csv], { type: 'text/csv' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
-            link.download = "report.csv";
+            link.download = `attendance_${date}.csv`;
             link.click();
         };
 
