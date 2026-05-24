@@ -1,59 +1,47 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mark Attendance</title>
-    <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f8fafc; }
-        .card { background: white; padding: 2rem; border-radius: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 90%; max-width: 400px; text-align: center; }
-        input { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 0.5rem; box-sizing: border-box; }
-        button { width: 100%; padding: 1rem; border: none; border-radius: 0.5rem; background: #007bff; color: white; font-weight: bold; cursor: pointer; }
-        button:disabled { background: #ccc; }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <h2 id="title">Loading...</h2>
-        <input type="text" id="name" placeholder="Enter Full Name">
-        <input type="text" id="index" placeholder="Enter Index Number">
-        <button id="btn" onclick="submitAttendance()">Mark Present</button>
-        <p id="msg"></p>
-    </div>
+<script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
 
-    <script type="module">
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+    const supabase = createClient('https://tnscsgqogoqrwdohytki.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc2NzZ3FvZ29xcndkb2h5dGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MTcwMjQsImV4cCI6MjA5NTE5MzAyNH0.Xy-QKWBrYXIMP7M_lBmW4SnUxlBpnbm_Poatd8W5Ph4');
 
-        const supabase = createClient('https://tnscsgqogoqrwdohytki.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc2NzZ3FvZ29xcndkb2h5dGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MTcwMjQsImV4cCI6MjA5NTE5MzAyNH0.Xy-QKWBrYXIMP7M_lBmW4SnUxlBpnbm_Poatd8W5Ph4');
+    const params = new URLSearchParams(window.location.search);
+    const classId = params.get('class') || 'cs101';
+    document.getElementById('title').innerText = "Class: " + classId.toUpperCase();
 
-        const params = new URLSearchParams(window.location.search);
-        const classId = params.get('class') || 'cs101';
-        document.getElementById('title').innerText = "Class: " + classId.toUpperCase();
+    let studentLat = null;
+    let studentLng = null;
 
-        window.submitAttendance = async () => {
-            const name = document.getElementById('name').value;
-            const index = document.getElementById('index').value;
-            const btn = document.getElementById('btn');
+    // Get location as soon as page loads
+    navigator.geolocation.getCurrentPosition((pos) => {
+        studentLat = pos.coords.latitude;
+        studentLng = pos.coords.longitude;
+    }, (err) => {
+        alert("Please enable GPS/Location to mark attendance.");
+    });
 
-            if(!name || !index) return alert("Please fill all fields");
+    window.submitAttendance = async () => {
+        const name = document.getElementById('name').value;
+        const index = document.getElementById('index').value;
+        const btn = document.getElementById('btn');
 
-            btn.disabled = true;
-            btn.innerText = "Saving...";
+        if(!name || !index) return alert("Please fill all fields");
+        if(!studentLat) return alert("Still detecting location... please wait a second.");
 
-            const { error } = await supabase.from('attendance').insert([{
-                student: name,
-                index_number: index,
-                class_id: classId
-            }]);
+        btn.disabled = true;
+        btn.innerText = "Saving...";
 
-            if (error) {
-                alert("Error: " + error.message);
-                btn.disabled = false;
-                btn.innerText = "Mark Present";
-            } else {
-                document.body.innerHTML = "<h1>✅ Success! Attendance marked.</h1>";
-            }
-        };
-    </script>
-</body>
-</html>
+        const { error } = await supabase.from('attendance').insert([{
+            student: name,
+            index_number: index,
+            class_id: classId,
+            lat: studentLat, // Saves student Latitude
+            lng: studentLng  // Saves student Longitude
+        }]);
+
+        if (error) {
+            alert("Error: " + error.message);
+            btn.disabled = false;
+        } else {
+            document.body.innerHTML = "<h1>✅ Success! Attendance marked with GPS.</h1>";
+        }
+    };
+</script>
