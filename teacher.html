@@ -1,18 +1,91 @@
-// Add this inside your <script type="module"> in teacher.html
-
-window.updateLoc = () => {
-    const cid = document.getElementById('classIdInput').value;
-    
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-        const { error } = await supabase
-            .from('classes')
-            .upsert({ 
-                id: cid, 
-                lat: pos.coords.latitude, 
-                lng: pos.coords.longitude 
-            });
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Dashboard</title>
+    <style>
+        body { font-family: sans-serif; background: #f8fafc; margin: 0; display: flex; }
+        .sidebar { width: 280px; background: white; height: 100vh; padding: 20px; border-right: 1px solid #ddd; position: fixed; box-sizing: border-box; }
+        .content { margin-left: 280px; padding: 40px; flex-grow: 1; }
+        table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f1f5f9; font-size: 12px; text-transform: uppercase; }
+        .btn { padding: 10px; width: 100%; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-bottom: 10px; color: white; }
+        .btn-blue { background: #007bff; }
+        .btn-green { background: #28a745; }
+        .map-link { color: #007bff; text-decoration: none; font-weight: bold; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>Dashboard</h2>
+        <label>CLASS ID</label>
+        <input type="text" id="classIdInput" value="cs101" onchange="refresh()" style="width:100%; padding:10px; margin-bottom:20px; box-sizing: border-box;">
         
-        if (error) alert("Error: " + error.message);
-        else alert(`📍 Room GPS set for ${cid}!`);
-    });
-};
+        <img id="qrImage" style="width:100%; margin-bottom:20px;">
+        
+        <button class="btn btn-blue" onclick="updateRoomGPS()">📍 Set Room GPS</button>
+        <button class="btn btn-green" onclick="downloadCSV()">📥 Download CSV</button>
+    </div>
+
+    <div class="content">
+        <h1>Attendance List (<span id="count">0</span>)</h1>
+        <table>
+            <thead>
+                <tr><th>Time</th><th>Student</th><th>Index</th><th>Location</th></tr>
+            </thead>
+            <tbody id="list"></tbody>
+        </table>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+        const supabase = createClient('https://tnscsgqogoqrwdohytki.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc2NzZ3FvZ29xcndkb2h5dGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MTcwMjQsImV4cCI6MjA5NTE5MzAyNH0.Xy-QKWBrYXIMP7M_lBmW4SnUxlBpnbm_Poatd8W5Ph4');
+
+        window.refresh = async () => {
+            const cid = document.getElementById('classIdInput').value;
+            const url = `https://ygideon75-cpu.github.io/attendance-system/?class=${cid}`;
+            document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(url)}`;
+            
+            const { data } = await supabase.from('attendance').select('*').eq('class_id', cid).order('created_at', { ascending: false });
+            if (data) {
+                document.getElementById('count').innerText = data.length;
+                document.getElementById('list').innerHTML = data.map(d => `
+                    <tr>
+                        <td>${new Date(d.created_at).toLocaleTimeString()}</td>
+                        <td><b>${d.student}</b></td>
+                        <td>${d.index_number}</td>
+                        <td><a href="https://www.google.com/maps?q=${d.lat},${d.lng}" target="_blank" class="map-link">📍 View Map</a></td>
+                    </tr>
+                `).join('') || "<tr><td colspan='4'>No records found</td></tr>";
+            }
+        };
+
+        // Instant Real-time Update
+        supabase.channel('db').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attendance' }, () => refresh()).subscribe();
+
+        window.updateRoomGPS = () => {
+            const cid = document.getElementById('classIdInput').value;
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const { error } = await supabase.from('classes').upsert({ id: cid, lat: pos.coords.latitude, lng: pos.coords.longitude });
+                alert(error ? "Error: " + error.message : "Room GPS set successfully!");
+            });
+        };
+
+        window.downloadCSV = () => {
+            let csv = "Time,Student,Index,Lat,Lng\n";
+            document.querySelectorAll("#list tr").forEach(tr => {
+                if(tr.cells.length > 1) csv += `${tr.cells[0].innerText},${tr.cells[1].innerText},${tr.cells[2].innerText}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "report.csv";
+            link.click();
+        };
+
+        refresh();
+    </script>
+</body>
+</html>
