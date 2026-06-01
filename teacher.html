@@ -3,154 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teacher Dashboard</title>
+    <title>Mark Attendance</title>
     <style>
-        body { font-family: sans-serif; background: #f8fafc; margin: 0; display: flex; }
-        .sidebar { width: 300px; background: white; height: 100vh; padding: 25px; border-right: 1px solid #e2e8f0; position: fixed; box-sizing: border-box; z-index: 100; }
-        .content { margin-left: 300px; padding: 40px; flex-grow: 1; }
-        h2 { margin-top: 0; color: #007bff; }
-        label { font-size: 11px; font-weight: bold; color: #64748b; display: block; margin-top: 15px; text-transform: uppercase; }
-        input { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; }
-        table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #f1f5f9; }
-        th { background: #f8fafc; color: #64748b; font-size: 12px; }
-        .btn { padding: 12px; width: 100%; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 20px; color: white; }
-        .btn-blue { background: #007bff; }
-        .btn-green { background: #10b981; }
-        #qrImage { width: 200px; height: 200px; margin-top: 10px; border: 1px solid #eee; background: #eee; display: block; margin-left: auto; margin-right: auto; }
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f1f5f9; }
+        .card { background: white; padding: 2rem; border-radius: 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 90%; max-width: 400px; text-align: center; }
+        button { width: 100%; padding: 1rem; border: none; border-radius: 0.5rem; background: #007bff; color: white; font-weight: bold; cursor: pointer; }
+        button:disabled { background: #cbd5e1; cursor: not-allowed; }
+        #status { font-size: 0.9rem; margin-top: 15px; font-weight: bold; }
+        #debug { font-size: 0.7rem; color: #64748b; margin-top: 15px; background: #f8fafc; padding: 10px; border-radius: 5px; text-align: left; line-height: 1.5; }
+        input { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 0.5rem; box-sizing: border-box; }
     </style>
 </head>
 <body>
-    <div class="sidebar">
-        <h2>Dashboard</h2>
+    <div class="card" id="mainCard">
+        <h2 id="title">Class: Loading...</h2>
+        <input type="text" id="name" placeholder="Full Name">
+        <input type="text" id="index" placeholder="Index Number">
         
-        <label>Class ID</label>
-        <input type="text" id="classIdInput" value="cs101" onchange="refresh()">
+        <div id="status">⏳ Verifying Location...</div>
+        <button id="btn" onclick="submitAttendance()" disabled>OUT OF RANGE</button>
 
-        <label>View Date</label>
-        <input type="date" id="dateFilter" onchange="refresh()">
-        
-        <div style="text-align: center; margin-top: 20px;">
-            <!-- QR Image -->
-            <img id="qrImage" alt="QR Code Loading...">
-            <p style="font-size: 10px; color: #94a3b8; margin-top: 5px;">SCAN TO MARK PRESENT</p>
+        <div id="debug">
+            <b>GPS Status:</b><br>
+            My Lat: <span id="myLat">...</span><br>
+            My Lng: <span id="myLng">...</span><br><br>
+            Room Lat: <span id="roomLat">...</span><br>
+            Room Lng: <span id="roomLng">...</span>
         </div>
-        
-        <button class="btn btn-blue" id="gpsBtn" onclick="updateRoomGPS()">📍 Set Room GPS</button>
-        <button class="btn btn-green" onclick="downloadCSV()">📥 Download CSV</button>
-    </div>
-
-    <div class="content">
-        <h1 id="pageTitle">Attendance List (<span id="count">0</span>)</h1>
-        <p id="debugMsg" style="color: red; font-size: 12px;"></p>
-        <table>
-            <thead>
-                <tr><th>Time</th><th>Student Name</th><th>Index</th><th>Location</th></tr>
-            </thead>
-            <tbody id="list"></tbody>
-        </table>
     </div>
 
     <script type="module">
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
-        
         const supabase = createClient('https://tnscsgqogoqrwdohytki.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc2NzZ3FvZ29xcndkb2h5dGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MTcwMjQsImV4cCI6MjA5NTE5MzAyNH0.Xy-QKWBrYXIMP7M_lBmW4SnUxlBpnbm_Poatd8W5Ph4');
 
-        // Set date to today automatically
-        document.getElementById('dateFilter').value = new Date().toISOString().split('T')[0];
+        const params = new URLSearchParams(window.location.search);
+        const classId = params.get('class') || 'cs101';
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('title').innerText = "Class: " + classId.toUpperCase();
 
-        window.refresh = async () => {
-            const cid = document.getElementById('classIdInput').value;
-            const selectedDate = document.getElementById('dateFilter').value;
-            const debug = document.getElementById('debugMsg');
-            debug.innerText = "";
+        if (localStorage.getItem('attendance_' + classId) === today) {
+            document.getElementById('mainCard').innerHTML = "<h2>✅ Already Marked Today</h2>";
+        }
 
-            // --- 1. SHOW QR CODE FIRST ---
-            // This part is independent of the database
-            const studentUrl = `https://ygideon75-cpu.github.io/attendance-system/?class=${cid}`;
-            const qrApi = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(studentUrl)}`;
-            document.getElementById('qrImage').src = qrApi;
+        let sLat, sLng;
 
-            // --- 2. FETCH DATA FROM SUPABASE ---
-            try {
-                const startOfDay = `${selectedDate}T00:00:00.000Z`;
-                const endOfDay = `${selectedDate}T23:59:59.999Z`;
+        navigator.geolocation.watchPosition(async (pos) => {
+            sLat = pos.coords.latitude;
+            sLng = pos.coords.longitude;
+            document.getElementById('myLat').innerText = sLat.toFixed(5);
+            document.getElementById('myLng').innerText = sLng.toFixed(5);
 
-                const { data, error } = await supabase
-                    .from('attendance')
-                    .select('*')
-                    .eq('class_id', cid)
-                    .gte('created_at', startOfDay)
-                    .lte('created_at', endOfDay)
-                    .order('created_at', { ascending: false });
+            const { data: cData } = await supabase.from('classes').select('*').eq('id', classId).single();
 
-                if (error) throw error;
+            if (cData && cData.lat) {
+                document.getElementById('roomLat').innerText = cData.lat.toFixed(5);
+                document.getElementById('roomLng').innerText = cData.lng.toFixed(5);
 
-                document.getElementById('count').innerText = data.length;
-                document.getElementById('list').innerHTML = data.map(d => `
-                    <tr>
-                        <td>${new Date(d.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
-                        <td><b>${d.student}</b></td>
-                        <td>${d.index_number}</td>
-                        <td><a href="https://www.google.com/maps?q=${d.lat},${d.lng}" target="_blank" style="color:#007bff; font-weight:bold; text-decoration:none;">📍 Map</a></td>
-                    </tr>
-                `).join('') || "<tr><td colspan='4' style='text-align:center; padding: 40px; color: #94a3b8;'>No records found for this date.</td></tr>";
-
-            } catch (err) {
-                console.error(err);
-                debug.innerText = "⚠️ Database Error: " + err.message + ". Check if 'attendance' table exists.";
-            }
-        };
-
-        // GPS Set Function
-        window.updateRoomGPS = () => {
-            const btn = document.getElementById('gpsBtn');
-            const cid = document.getElementById('classIdInput').value;
-            btn.innerText = "⏳ Locating...";
-            btn.disabled = true;
-
-            navigator.geolocation.getCurrentPosition(
-                async (pos) => {
-                    const { error } = await supabase.from('classes').upsert({ 
-                        id: cid, lat: pos.coords.latitude, lng: pos.coords.longitude 
-                    });
-                    if (error) alert("Error: " + error.message);
-                    else alert("✅ Success! Room GPS set.");
-                    btn.innerText = "📍 Set Room GPS";
-                    btn.disabled = false;
-                },
-                (err) => {
-                    alert("GPS Error: " + err.message);
-                    btn.innerText = "📍 Set Room GPS";
-                    btn.disabled = false;
-                },
-                { enableHighAccuracy: true }
-            );
-        };
-
-        // CSV Export
-        window.downloadCSV = () => {
-            let csv = "Time,Student,Index,Lat,Lng\n";
-            document.querySelectorAll("#list tr").forEach(tr => {
-                if(tr.cells.length > 1) {
-                    csv += `${tr.cells[0].innerText},${tr.cells[1].innerText.replace(',','')},${tr.cells[2].innerText}\n`;
-                }
-            });
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = `attendance_${document.getElementById('dateFilter').value}.csv`;
-            link.click();
-        };
-
-        // Start everything
-        refresh();
-
-        // Listen for new scans in real-time
-        supabase.channel('db').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attendance' }, () => {
-            if(document.getElementById('dateFilter').value === new Date().toISOString().split('T')[0]) refresh();
-        }).subscribe();
-
-    </script>
-</body>
-</html>
+                const dist = getDist(sLat, sLng, cData.lat, cData.lng);
+                const meters = Math.round(dist * 1000);
+                
+                if (dist <= 0.5) { // INCREASED TO 500 METERS (0.5km)
+                    document.getElementById('status').innerText = `📍 In Range (${meters}m)`;
+                    document.getElementById('status').style.color = "green";
+                    document.getElementById('btn').disabled = false;
