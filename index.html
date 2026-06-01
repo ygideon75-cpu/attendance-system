@@ -5,68 +5,87 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mark Attendance</title>
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f1f5f9; }
-        .card { background: white; padding: 2rem; border-radius: 1rem; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 90%; max-width: 400px; text-align: center; }
-        input { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 0.5rem; box-sizing: border-box; font-size: 1rem; }
+        body { font-family: -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f1f5f9; }
+        .card { background: white; padding: 2.5rem; border-radius: 1.5rem; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 90%; max-width: 400px; text-align: center; }
         button { width: 100%; padding: 1rem; border: none; border-radius: 0.5rem; background: #007bff; color: white; font-weight: bold; cursor: pointer; font-size: 1rem; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        #status { font-size: 0.8rem; margin-top: 10px; font-weight: bold; }
+        button:disabled { background: #cbd5e1; cursor: not-allowed; color: #64748b; }
+        #status { font-size: 0.85rem; margin-top: 15px; font-weight: 600; color: #dc2626; } /* Default to Red */
+        input { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; box-sizing: border-box; }
     </style>
 </head>
 <body>
-    <div class="card">
+    <div class="card" id="mainCard">
         <h2 id="title">Class: Loading...</h2>
         <input type="text" id="name" placeholder="Full Name">
         <input type="text" id="index" placeholder="Index Number">
-        <div id="status">⏳ Detecting Location...</div>
-        <button id="btn" onclick="submitAttendance()" disabled>Mark Present</button>
+        <div id="status">⏳ Verifying Location...</div>
+        <button id="btn" onclick="submitAttendance()" disabled>OUT OF RANGE</button>
     </div>
 
     <script type="module">
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
-
         const supabase = createClient('https://tnscsgqogoqrwdohytki.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc2NzZ3FvZ29xcndkb2h5dGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MTcwMjQsImV4cCI6MjA5NTE5MzAyNH0.Xy-QKWBrYXIMP7M_lBmW4SnUxlBpnbm_Poatd8W5Ph4');
 
         const params = new URLSearchParams(window.location.search);
         const classId = params.get('class') || 'cs101';
+        const today = new Date().toISOString().split('T')[0];
         document.getElementById('title').innerText = "Class: " + classId.toUpperCase();
 
-        let lat = null, lng = null;
+        if (localStorage.getItem('attendance_' + classId) === today) {
+            document.getElementById('mainCard').innerHTML = "<h2>✅ Already Marked</h2>";
+        }
 
-        // Detect GPS Location
-        navigator.geolocation.getCurrentPosition((pos) => {
-            lat = pos.coords.latitude;
-            lng = pos.coords.longitude;
-            document.getElementById('status').innerText = "📍 Location Detected";
-            document.getElementById('status').style.color = "green";
-            document.getElementById('btn').disabled = false;
+        let sLat, sLng;
+
+        // FORCE HIGH ACCURACY GPS
+        navigator.geolocation.watchPosition(async (pos) => {
+            sLat = pos.coords.latitude;
+            sLng = pos.coords.longitude;
+
+            const { data: cData } = await supabase.from('classes').select('*').eq('id', classId).single();
+
+            if (cData && cData.lat) {
+                const dist = getDist(sLat, sLng, cData.lat, cData.lng);
+                const meters = Math.round(dist * 1000);
+                
+                if (dist <= 0.08) { // STRICT 80 METER LIMIT
+                    document.getElementById('status').innerText = `📍 In Range (${meters}m)`;
+                    document.getElementById('status').style.color = "#16a34a";
+                    document.getElementById('btn').disabled = false;
+                    document.getElementById('btn').innerText = "Mark Present";
+                } else {
+                    document.getElementById('status').innerText = `❌ Too Far (${meters}m). Go to class!`;
+                    document.getElementById('status').style.color = "#dc2626";
+                    document.getElementById('btn').disabled = true;
+                    document.getElementById('btn').innerText = "OUT OF RANGE";
+                }
+            } else {
+                document.getElementById('status').innerText = "⚠️ Room GPS not set by Teacher.";
+            }
         }, (err) => {
-            document.getElementById('status').innerText = "❌ Please enable GPS to mark attendance";
-            document.getElementById('status').style.color = "red";
+            document.getElementById('status').innerText = "❌ GPS Error. Please enable Location.";
         }, { enableHighAccuracy: true });
+
+        function getDist(la1, lo1, la2, lo2) {
+            const R = 6371; 
+            const dLat = (la2-la1)*Math.PI/180;
+            const dLon = (lo2-lo1)*Math.PI/180;
+            const a = Math.sin(dLat/2)**2 + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLon/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
 
         window.submitAttendance = async () => {
             const name = document.getElementById('name').value;
             const index = document.getElementById('index').value;
-            if(!name || !index) return alert("Fill all fields");
+            if(!name || !index) return alert("Fill fields");
 
-            document.getElementById('btn').innerText = "Saving...";
-            document.getElementById('btn').disabled = true;
+            const { data: exist } = await supabase.from('attendance').select('id').eq('index_number', index).eq('class_id', classId).gte('created_at', today + 'T00:00:00Z');
+            if (exist && exist.length > 0) return alert("Already marked today!");
 
-            const { error } = await supabase.from('attendance').insert([{
-                student: name,
-                index_number: index,
-                class_id: classId,
-                lat: lat,
-                lng: lng
-            }]);
-
-            if (error) {
-                alert("Error: " + error.message);
-                document.getElementById('btn').disabled = false;
-                document.getElementById('btn').innerText = "Mark Present";
-            } else {
-                document.body.innerHTML = "<h2 style='text-align:center; margin-top:50px;'>✅ Done! Attendance recorded.</h2>";
+            const { error } = await supabase.from('attendance').insert([{ student: name, index_number: index, class_id: classId, lat: sLat, lng: sLng }]);
+            if (!error) {
+                localStorage.setItem('attendance_' + classId, today);
+                document.getElementById('mainCard').innerHTML = "<h2>✅ Recorded!</h2>";
             }
         };
     </script>
