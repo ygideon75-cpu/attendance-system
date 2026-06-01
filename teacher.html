@@ -6,32 +6,30 @@
     <title>Teacher Dashboard</title>
     <style>
         body { font-family: sans-serif; background: #f8fafc; margin: 0; display: flex; }
-        .sidebar { width: 280px; background: white; height: 100vh; padding: 20px; border-right: 1px solid #ddd; position: fixed; box-sizing: border-box; }
-        .content { margin-left: 280px; padding: 40px; flex-grow: 1; }
-        table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #f1f5f9; font-size: 12px; text-transform: uppercase; }
-        .btn { padding: 10px; width: 100%; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-bottom: 10px; color: white; }
+        .sidebar { width: 300px; background: white; height: 100vh; padding: 25px; border-right: 1px solid #e2e8f0; position: fixed; box-sizing: border-box; }
+        .content { margin-left: 300px; padding: 40px; flex-grow: 1; }
+        label { font-size: 11px; font-weight: bold; color: #64748b; display: block; margin-top: 15px; text-transform: uppercase; }
+        input { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #f1f5f9; }
+        .btn { padding: 12px; width: 100%; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 20px; color: white; }
         .btn-blue { background: #007bff; }
-        .btn-green { background: #28a745; }
-        .map-link { color: #007bff; text-decoration: none; font-weight: bold; font-size: 12px; }
-        label { font-size: 11px; font-weight: bold; color: #64748b; margin-top: 15px; display: block; }
-        input { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        .btn-green { background: #10b981; }
     </style>
 </head>
 <body>
     <div class="sidebar">
         <h2>Dashboard</h2>
-        
-        <label>CLASS ID</label>
+        <label>Class ID</label>
         <input type="text" id="classIdInput" value="cs101" onchange="refresh()">
-
-        <label>FILTER BY DATE</label>
+        <label>View Date</label>
         <input type="date" id="dateFilter" onchange="refresh()">
         
-        <img id="qrImage" style="width:100%; margin-bottom:20px; border: 1px solid #eee;">
+        <div style="text-align: center; margin-top: 25px;">
+            <img id="qrImage" style="width: 180px; height: 180px; border: 1px solid #f1f5f9; padding: 10px;">
+        </div>
         
-        <button class="btn btn-blue" onclick="updateRoomGPS()">📍 Set Room GPS</button>
+        <button class="btn btn-blue" id="gpsBtn" onclick="updateRoomGPS()">📍 Set Room GPS</button>
         <button class="btn btn-green" onclick="downloadCSV()">📥 Download CSV</button>
     </div>
 
@@ -39,86 +37,10 @@
         <h1>Attendance List (<span id="count">0</span>)</h1>
         <table>
             <thead>
-                <tr><th>Time</th><th>Student</th><th>Index</th><th>Location</th></tr>
+                <tr><th>Time</th><th>Student Name</th><th>Index</th><th>Map</th></tr>
             </thead>
             <tbody id="list"></tbody>
         </table>
     </div>
 
-    <script type="module">
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
-        
-        const supabase = createClient('https://tnscsgqogoqrwdohytki.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc2NzZ3FvZ29xcndkb2h5dGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MTcwMjQsImV4cCI6MjA5NTE5MzAyNH0.Xy-QKWBrYXIMP7M_lBmW4SnUxlBpnbm_Poatd8W5Ph4');
-
-        // Set the default date to Today
-        document.getElementById('dateFilter').value = new Date().toISOString().split('T')[0];
-
-        window.refresh = async () => {
-            const cid = document.getElementById('classIdInput').value;
-            const selectedDate = document.getElementById('dateFilter').value;
-            
-            // Update QR Code
-            const url = `https://ygideon75-cpu.github.io/attendance-system/?class=${cid}`;
-            document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(url)}`;
-            
-            // Create range for the selected day (From 00:00:00 to 23:59:59)
-            const startOfDay = `${selectedDate}T00:00:00.000Z`;
-            const endOfDay = `${selectedDate}T23:59:59.999Z`;
-
-            const { data, error } = await supabase
-                .from('attendance')
-                .select('*')
-                .eq('class_id', cid)
-                .gte('created_at', startOfDay)
-                .lte('created_at', endOfDay)
-                .order('created_at', { ascending: false });
-
-            if (data) {
-                document.getElementById('count').innerText = data.length;
-                document.getElementById('list').innerHTML = data.map(d => `
-                    <tr>
-                        <td>${new Date(d.created_at).toLocaleTimeString()}</td>
-                        <td><b>${d.student}</b></td>
-                        <td>${d.index_number}</td>
-                        <td><a href="https://www.google.com/maps?q=${d.lat},${d.lng}" target="_blank" class="map-link">📍 View Map</a></td>
-                    </tr>
-                `).join('') || "<tr><td colspan='4' style='text-align:center; padding:20px;'>No records for this date.</td></tr>";
-            }
-        };
-
-        // Real-time Update (Only refreshes if the date is set to "Today")
-        supabase.channel('db').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attendance' }, (payload) => {
-            const today = new Date().toISOString().split('T')[0];
-            const currentFilter = document.getElementById('dateFilter').value;
-            if (today === currentFilter) refresh();
-        }).subscribe();
-
-        window.updateRoomGPS = () => {
-            const cid = document.getElementById('classIdInput').value;
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-                const { error } = await supabase.from('classes').upsert({ id: cid, lat: pos.coords.latitude, lng: pos.coords.longitude });
-                alert(error ? "Error: " + error.message : "Room GPS set successfully!");
-            });
-        };
-
-        window.downloadCSV = () => {
-            const date = document.getElementById('dateFilter').value;
-            let csv = "Time,Student,Index,Latitude,Longitude\n";
-            document.querySelectorAll("#list tr").forEach(tr => {
-                if(tr.cells.length > 1) {
-                    // Extract text and remove commas to avoid CSV errors
-                    const row = Array.from(tr.cells).map(cell => cell.innerText.replace(',', '')).join(',');
-                    csv += row + "\n";
-                }
-            });
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = `attendance_${date}.csv`;
-            link.click();
-        };
-
-        refresh();
-    </script>
-</body>
-</html>
+    <script type=
