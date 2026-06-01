@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mark Attendance</title>
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f1f5f9; }
-        .card { background: white; padding: 2rem; border-radius: 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 90%; max-width: 400px; text-align: center; }
-        button { width: 100%; padding: 1rem; border: none; border-radius: 0.5rem; background: #007bff; color: white; font-weight: bold; cursor: pointer; }
-        button:disabled { background: #cbd5e1; cursor: not-allowed; }
+        body { font-family: -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f1f5f9; }
+        .card { background: white; padding: 2.5rem; border-radius: 1.5rem; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 90%; max-width: 400px; text-align: center; }
+        button { width: 100%; padding: 1rem; border: none; border-radius: 0.5rem; background: #007bff; color: white; font-weight: bold; cursor: pointer; font-size: 1rem; }
+        button:disabled { background: #cbd5e1; cursor: not-allowed; color: #64748b; }
         #status { font-size: 0.9rem; margin-top: 15px; font-weight: bold; }
-        #debug { font-size: 0.7rem; color: #64748b; margin-top: 15px; background: #f8fafc; padding: 10px; border-radius: 5px; text-align: left; line-height: 1.5; }
-        input { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 0.5rem; box-sizing: border-box; }
+        #debug { font-size: 0.7rem; color: #64748b; margin-top: 15px; background: #f8fafc; padding: 10px; border-radius: 8px; text-align: left; }
+        input { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; box-sizing: border-box; }
     </style>
 </head>
 <body>
@@ -24,7 +24,7 @@
         <button id="btn" onclick="submitAttendance()" disabled>OUT OF RANGE</button>
 
         <div id="debug">
-            <b>GPS Status:</b><br>
+            <b>GPS Figures:</b><br>
             My Lat: <span id="myLat">...</span><br>
             My Lng: <span id="myLng">...</span><br><br>
             Room Lat: <span id="roomLat">...</span><br>
@@ -47,6 +47,7 @@
 
         let sLat, sLng;
 
+        // Watch position in real-time
         navigator.geolocation.watchPosition(async (pos) => {
             sLat = pos.coords.latitude;
             sLng = pos.coords.longitude;
@@ -62,14 +63,15 @@
                 const dist = getDist(sLat, sLng, cData.lat, cData.lng);
                 const meters = Math.round(dist * 1000);
                 
-                if (dist <= 0.5) { // INCREASED TO 500 METERS (0.5km)
+                // --- RADIUS LIMIT: 0.1 KM = 100 METERS ---
+                if (dist <= 0.1) { 
                     document.getElementById('status').innerText = `📍 In Range (${meters}m)`;
-                    document.getElementById('status').style.color = "green";
+                    document.getElementById('status').style.color = "#16a34a";
                     document.getElementById('btn').disabled = false;
                     document.getElementById('btn').innerText = "Mark Present";
                 } else {
                     document.getElementById('status').innerText = `❌ Too Far (${meters}m)`;
-                    document.getElementById('status').style.color = "red";
+                    document.getElementById('status').style.color = "#dc2626";
                     document.getElementById('btn').disabled = true;
                     document.getElementById('btn').innerText = "OUT OF RANGE";
                 }
@@ -80,6 +82,7 @@
             document.getElementById('status').innerText = "❌ GPS Error. Enable location.";
         }, { enableHighAccuracy: true });
 
+        // Haversine formula for distance
         function getDist(la1, lo1, la2, lo2) {
             const R = 6371; 
             const dLat = (la2-la1)*Math.PI/180;
@@ -93,10 +96,17 @@
             const index = document.getElementById('index').value;
             if(!name || !index) return alert("Fill fields");
 
-            const { error } = await supabase.from('attendance').insert([{ student: name, index_number: index, class_id: classId, lat: sLat, lng: sLng }]);
+            const { error } = await supabase.from('attendance').insert([{ 
+                student: name, 
+                index_number: index, 
+                class_id: classId, 
+                lat: sLat, 
+                lng: sLng 
+            }]);
+
             if (!error) {
                 localStorage.setItem('attendance_' + classId, today);
-                document.getElementById('mainCard').innerHTML = "<h2>✅ Success!</h2>";
+                document.getElementById('mainCard').innerHTML = "<h2>✅ Success!</h2><p>Attendance recorded.</p>";
             } else {
                 alert("Error: " + error.message);
             }
