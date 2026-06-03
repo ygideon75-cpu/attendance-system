@@ -7,11 +7,10 @@
     <style>
         body { font-family: -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f1f5f9; }
         .card { background: white; padding: 2.5rem; border-radius: 1.5rem; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 90%; max-width: 400px; text-align: center; }
-        button { width: 100%; padding: 1rem; border: none; border-radius: 0.5rem; background: #007bff; color: white; font-weight: bold; cursor: pointer; font-size: 1rem; }
-        button:disabled { background: #cbd5e1; cursor: not-allowed; color: #64748b; }
-        #status { font-size: 0.9rem; margin-top: 15px; font-weight: bold; }
-        #debug { font-size: 0.7rem; color: #64748b; margin-top: 15px; background: #f8fafc; padding: 10px; border-radius: 8px; text-align: left; }
         input { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; box-sizing: border-box; }
+        button { width: 100%; padding: 1rem; border: none; border-radius: 0.5rem; background: #007bff; color: white; font-weight: bold; cursor: pointer; }
+        button:disabled { background: #cbd5e1; cursor: not-allowed; }
+        #status { font-size: 0.85rem; margin-top: 15px; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -19,17 +18,8 @@
         <h2 id="title">Class: Loading...</h2>
         <input type="text" id="name" placeholder="Full Name">
         <input type="text" id="index" placeholder="Index Number">
-        
-        <div id="status">⏳ Verifying Location...</div>
+        <div id="status" style="color: #64748b;">⏳ Verifying Device & Location...</div>
         <button id="btn" onclick="submitAttendance()" disabled>OUT OF RANGE</button>
-
-        <div id="debug">
-            <b>GPS Figures:</b><br>
-            My Lat: <span id="myLat">...</span><br>
-            My Lng: <span id="myLng">...</span><br><br>
-            Room Lat: <span id="roomLat">...</span><br>
-            Room Lng: <span id="roomLng">...</span>
-        </div>
     </div>
 
     <script type="module">
@@ -41,52 +31,57 @@
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('title').innerText = "Class: " + classId.toUpperCase();
 
-        if (localStorage.getItem('attendance_' + classId) === today) {
-            document.getElementById('mainCard').innerHTML = "<h2>✅ Already Marked Today</h2>";
+        // --- 1. GENERATE / RETRIEVE UNIQUE DEVICE ID ---
+        let deviceId = localStorage.getItem('device_id');
+        if (!deviceId) {
+            deviceId = 'dev_' + Math.random().toString(36).substr(2, 9) + Date.now();
+            localStorage.setItem('device_id', deviceId);
         }
 
+        // --- 2. CHECK IF THIS PHONE ALREADY SUBMITTED TODAY ---
+        async function checkDeviceLock() {
+            const startOfDay = `${today}T00:00:00.000Z`;
+            const { data } = await supabase
+                .from('attendance')
+                .select('id')
+                .eq('device_id', deviceId)
+                .eq('class_id', classId)
+                .gte('created_at', startOfDay);
+
+            if (data && data.length > 0) {
+                document.getElementById('mainCard').innerHTML = "<h2>❌ Device Locked</h2><p>This phone has already been used to mark attendance for this class today. One student per device only.</p>";
+                return true;
+            }
+            return false;
+        }
+
+        let isLocked = false;
+        checkDeviceLock().then(res => isLocked = res);
+
         let sLat, sLng;
-
-        // Watch position in real-time
         navigator.geolocation.watchPosition(async (pos) => {
-            sLat = pos.coords.latitude;
-            sLng = pos.coords.longitude;
-            document.getElementById('myLat').innerText = sLat.toFixed(5);
-            document.getElementById('myLng').innerText = sLng.toFixed(5);
-
+            if (isLocked) return;
+            sLat = pos.coords.latitude; sLng = pos.coords.longitude;
             const { data: cData } = await supabase.from('classes').select('*').eq('id', classId).single();
-
             if (cData && cData.lat) {
-                document.getElementById('roomLat').innerText = cData.lat.toFixed(5);
-                document.getElementById('roomLng').innerText = cData.lng.toFixed(5);
-
                 const dist = getDist(sLat, sLng, cData.lat, cData.lng);
-                const meters = Math.round(dist * 1000);
-                
-                // --- RADIUS LIMIT: 0.1 KM = 100 METERS ---
-                if (dist <= 0.1) { 
-                    document.getElementById('status').innerText = `📍 In Range (${meters}m)`;
-                    document.getElementById('status').style.color = "#16a34a";
+                if (dist <= 0.1) { // 100 Meters
+                    document.getElementById('status').innerText = "📍 Location Verified (In Class)";
+                    document.getElementById('status').style.color = "green";
                     document.getElementById('btn').disabled = false;
                     document.getElementById('btn').innerText = "Mark Present";
                 } else {
-                    document.getElementById('status').innerText = `❌ Too Far (${meters}m)`;
-                    document.getElementById('status').style.color = "#dc2626";
+                    document.getElementById('status').innerText = "❌ Too Far (" + Math.round(dist*1000) + "m)";
+                    document.getElementById('status').style.color = "red";
                     document.getElementById('btn').disabled = true;
                     document.getElementById('btn').innerText = "OUT OF RANGE";
                 }
-            } else {
-                document.getElementById('status').innerText = "⚠️ Room location NOT SET by teacher.";
             }
-        }, (err) => {
-            document.getElementById('status').innerText = "❌ GPS Error. Enable location.";
-        }, { enableHighAccuracy: true });
+        }, null, { enableHighAccuracy: true });
 
-        // Haversine formula for distance
         function getDist(la1, lo1, la2, lo2) {
             const R = 6371; 
-            const dLat = (la2-la1)*Math.PI/180;
-            const dLon = (lo2-lo1)*Math.PI/180;
+            const dLat = (la2-la1)*Math.PI/180; const dLon = (lo2-lo1)*Math.PI/180;
             const a = Math.sin(dLat/2)**2 + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLon/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
@@ -96,16 +91,30 @@
             const index = document.getElementById('index').value;
             if(!name || !index) return alert("Fill fields");
 
+            // --- 3. FINAL DATABASE CHECK (Index & Device) ---
+            const startOfDay = `${today}T00:00:00.000Z`;
+            const { data: existing } = await supabase
+                .from('attendance')
+                .select('id')
+                .or(`index_number.eq.${index},device_id.eq.${deviceId}`) // Check BOTH index and phone
+                .eq('class_id', classId)
+                .gte('created_at', startOfDay);
+
+            if (existing && existing.length > 0) {
+                alert("Security Error: This Index Number or Phone has already been used today!");
+                return;
+            }
+
             const { error } = await supabase.from('attendance').insert([{ 
                 student: name, 
                 index_number: index, 
                 class_id: classId, 
                 lat: sLat, 
-                lng: sLng 
+                lng: sLng,
+                device_id: deviceId 
             }]);
 
             if (!error) {
-                localStorage.setItem('attendance_' + classId, today);
                 document.getElementById('mainCard').innerHTML = "<h2>✅ Success!</h2><p>Attendance recorded.</p>";
             } else {
                 alert("Error: " + error.message);
