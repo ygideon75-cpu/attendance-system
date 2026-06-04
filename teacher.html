@@ -1,225 +1,33 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard | TTU Attendance</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-        /* Security: Hide dashboard until password verified */
-        #adminWrapper { display: none; }
-        
-        body { font-family: 'Inter', sans-serif; background: #f1f5f9; margin: 0; color: #1e293b; }
-        
-        /* Login Screen Styles */
-        .login-screen { display: flex; justify-content: center; align-items: center; height: 100vh; background: #004085; }
-        .login-card { background: white; padding: 2.5rem; border-radius: 1.5rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); width: 100%; max-width: 350px; text-align: center; }
-        .login-card h2 { margin-bottom: 1.5rem; color: #004085; }
-        
-        /* Dashboard Styles */
-        .sidebar { width: 320px; background: white; height: 100vh; padding: 25px; border-right: 1px solid #e2e8f0; position: fixed; box-sizing: border-box; overflow-y: auto; }
-        .content { margin-left: 320px; padding: 40px; flex-grow: 1; }
-        
-        label { font-size: 11px; font-weight: 700; color: #64748b; display: block; margin-top: 15px; text-transform: uppercase; letter-spacing: 0.05em; }
-        input, select { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 0.9rem; }
-        
-        .btn { padding: 12px; width: 100%; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; margin-top: 15px; transition: 0.2s; font-size: 0.9rem; }
-        .btn-blue { background: #007bff; color: white; }
-        .btn-blue:hover { background: #0056b3; }
-        .btn-green { background: #10b981; color: white; }
-        .btn-red { background: #ef4444; color: white; margin-top: 30px; font-size: 0.75rem; }
-        
-        table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #f1f5f9; }
-        th { background: #f8fafc; color: #64748b; font-size: 11px; text-transform: uppercase; }
-        
-        #qrImage { width: 180px; height: 180px; margin: 20px auto; display: block; border: 1px solid #e2e8f0; padding: 10px; border-radius: 12px; background: white; }
-        .badge { background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
-    </style>
-</head>
-<body>
+-- 1. CLEAN START: Clear old versions
+DROP TABLE IF EXISTS attendance;
+DROP TABLE IF EXISTS classes;
 
-    <!-- 1. LOGIN SCREEN -->
-    <div id="loginScreen" class="login-screen">
-        <div class="login-card">
-            <h2>Admin Login</h2>
-            <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 1.5rem;">Secure Access to Attendance Records</p>
-            <input type="password" id="adminPass" placeholder="Enter System Password">
-            <button class="btn btn-blue" onclick="verifyAdmin()">Unlock Portal</button>
-        </div>
-    </div>
+-- 2. CREATE CLASSES TABLE
+CREATE TABLE classes (
+  id text PRIMARY KEY,      -- Technical ID (eg. cs101)
+  name text NOT NULL,       -- Formal Name (eg. Computer Science 1)
+  lat float8,               -- Room Latitude
+  lng float8                -- Room Longitude
+);
 
-    <!-- 2. PROTECTED DASHBOARD -->
-    <div id="adminWrapper">
-        <div class="sidebar">
-            <h2 style="color:#004085; font-size: 1.25rem;">TTU Admin Portal</h2>
-            
-            <label>Load Previous Class</label>
-            <select id="classSelector" onchange="selectSavedClass()"></select>
-            
-            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #e2e8f0;">
-            
-            <label>New/Active Class ID</label>
-            <input type="text" id="classIdInput" value="cs101" onchange="refresh()">
+-- 3. CREATE ATTENDANCE TABLE
+CREATE TABLE attendance (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  student text NOT NULL,
+  index_number text NOT NULL,
+  class_id text NOT NULL,
+  device_id text NOT NULL,   -- Hardware ID (Prevents cheating)
+  lat float8,                -- Student's Lat
+  lng float8,                -- Student's Lng
+  created_at timestamptz DEFAULT now()
+);
 
-            <label>Course Name</label>
-            <input type="text" id="classNameInput" placeholder="e.g. Data Structures">
+-- 4. DISABLE SECURITY (Allows public web access for now)
+ALTER TABLE attendance DISABLE ROW LEVEL SECURITY;
+ALTER TABLE classes DISABLE ROW LEVEL SECURITY;
 
-            <label>Filter Date</label>
-            <input type="date" id="dateFilter" onchange="refresh()">
-            
-            <img id="qrImage" alt="QR Code">
-            
-            <button class="btn btn-blue" id="gpsBtn" onclick="updateRoomGPS()">📍 Set Room GPS & Name</button>
-            <button class="btn btn-green" onclick="downloadCSV()">📥 Export CSV Report</button>
-            
-            <button class="btn btn-red" onclick="location.reload()">🔒 Logout System</button>
-        </div>
-
-        <div class="content">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                <h1 style="margin:0;">Attendance Log</h1>
-                <div class="badge">Total: <span id="count">0</span> Students</div>
-            </div>
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>Sign-in Time</th>
-                        <th>Student Name</th>
-                        <th>Index Number</th>
-                        <th>Verification</th>
-                    </tr>
-                </thead>
-                <tbody id="list"></tbody>
-            </table>
-        </div>
-    </div>
-
-    <script type="module">
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
-        
-        const supabase = createClient('https://tnscsgqogoqrwdohytki.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc2NzZ3FvZ29xcndkb2h5dGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MTcwMjQsImV4cCI6MjA5NTE5MzAyNH0.Xy-QKWBrYXIMP7M_lBmW4SnUxlBpnbm_Poatd8W5Ph4');
-
-        // --- PASSWORD PROTECTION LOGIC ---
-        window.verifyAdmin = () => {
-            const pass = document.getElementById('adminPass').value;
-            if (pass === "TTUattendance@50") {
-                document.getElementById('loginScreen').style.display = "none";
-                document.getElementById('adminWrapper').style.display = "flex";
-                loadClassHistory();
-                refresh();
-            } else {
-                alert("Access Denied: Incorrect Password");
-            }
-        };
-
-        // Listen for "Enter" key on password field
-        document.getElementById("adminPass").addEventListener("keypress", (e) => {
-            if (e.key === "Enter") verifyAdmin();
-        });
-
-        document.getElementById('dateFilter').value = new Date().toISOString().split('T')[0];
-
-        async function loadClassHistory() {
-            const { data } = await supabase.from('classes').select('id, name').order('name');
-            const selector = document.getElementById('classSelector');
-            selector.innerHTML = '<option value="">-- Select Saved Session --</option>';
-            data?.forEach(c => {
-                const opt = document.createElement('option');
-                opt.value = c.id;
-                opt.innerText = `${c.name || 'Untitled'} (${c.id})`;
-                selector.appendChild(opt);
-            });
-        }
-
-        window.selectSavedClass = () => {
-            const val = document.getElementById('classSelector').value;
-            if (val) {
-                document.getElementById('classIdInput').value = val;
-                refresh();
-            }
-        };
-
-        window.refresh = async () => {
-            const cid = document.getElementById('classIdInput').value;
-            const date = document.getElementById('dateFilter').value;
-            
-            // URL points to your student index page
-            const studentUrl = `https://ygideon75-cpu.github.io/attendance-system/?class=${cid}`;
-            document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(studentUrl)}`;
-            
-            const startOfDay = `${date}T00:00:00.000Z`;
-            const endOfDay = `${date}T23:59:59.999Z`;
-
-            const { data } = await supabase
-                .from('attendance')
-                .select('*')
-                .eq('class_id', cid)
-                .gte('created_at', startOfDay)
-                .lte('created_at', endOfDay)
-                .order('created_at', { ascending: false });
-
-            if (data) {
-                document.getElementById('count').innerText = data.length;
-                document.getElementById('list').innerHTML = data.map(d => `
-                    <tr>
-                        <td>${new Date(d.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
-                        <td><b>${d.student}</b></td>
-                        <td>${d.index_number}</td>
-                        <td><a href="https://www.google.com/maps?q=${d.lat},${d.lng}" target="_blank" style="color:#007bff; font-weight:bold; text-decoration:none; font-size:11px;">📍 View Location</a></td>
-                    </tr>
-                `).join('') || "<tr><td colspan='4' style='text-align:center; padding: 40px; color: #94a3b8;'>No records for this date.</td></tr>";
-            }
-        };
-
-        window.updateRoomGPS = () => {
-            const btn = document.getElementById('gpsBtn');
-            const cid = document.getElementById('classIdInput').value;
-            const cName = document.getElementById('classNameInput').value;
-
-            if(!cName) return alert("Please enter the Course Name first!");
-
-            btn.innerText = "⏳ Capturing GPS...";
-            btn.disabled = true;
-
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-                const { error } = await supabase.from('classes').upsert({ 
-                    id: cid, name: cName, lat: pos.coords.latitude, lng: pos.coords.longitude 
-                });
-                if (error) alert("Error: " + error.message);
-                else {
-                    alert(`✅ ${cName} session is now live at this location!`);
-                    loadClassHistory();
-                }
-                btn.innerText = "📍 Set Room GPS & Name";
-                btn.disabled = false;
-            }, (err) => {
-                alert("GPS Error: " + err.message);
-                btn.disabled = false;
-                btn.innerText = "📍 Set Room GPS & Name";
-            }, { enableHighAccuracy: true });
-        };
-
-        window.downloadCSV = () => {
-            const cid = document.getElementById('classIdInput').value;
-            const date = document.getElementById('dateFilter').value;
-            let csv = "Time,Student,Index,Latitude,Longitude\n";
-            document.querySelectorAll("#list tr").forEach(tr => {
-                if(tr.cells.length > 1) {
-                    csv += `${tr.cells[0].innerText},${tr.cells[1].innerText.replace(',','')},${tr.cells[2].innerText},${tr.cells[3].querySelector('a').href.split('q=')[1]}\n`;
-                }
-            });
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = `Attendance_${cid}_${date}.csv`;
-            link.click();
-        };
-
-        supabase.channel('db').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attendance' }, () => {
-            if(document.getElementById('dateFilter').value === new Date().toISOString().split('T')[0]) refresh();
-        }).subscribe();
-    </script>
-</body>
-</html>
+-- 5. ENABLE REALTIME BROADCASTING
+BEGIN;
+  DROP PUBLICATION IF EXISTS supabase_realtime;
+  CREATE PUBLICATION supabase_realtime FOR TABLE attendance;
+COMMIT;
