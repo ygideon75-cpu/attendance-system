@@ -3,58 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard | TTU Attendance</title>
+    <title>Admin | TTU Attendance Portal</title>
     <style>
         #adminWrapper { display: none; }
-        body { font-family: -apple-system, sans-serif; background: #f1f5f9; margin: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f8fafc; margin: 0; }
         .login-screen { display: flex; justify-content: center; align-items: center; height: 100vh; background: #004085; }
-        .login-card { background: white; padding: 2.5rem; border-radius: 1.5rem; width: 320px; text-align: center; }
+        .login-card { background: white; padding: 2.5rem; border-radius: 1rem; width: 320px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
         .sidebar { width: 320px; background: white; height: 100vh; padding: 25px; border-right: 1px solid #e2e8f0; position: fixed; box-sizing: border-box; }
         .content { margin-left: 320px; padding: 40px; flex-grow: 1; }
-        label { font-size: 11px; font-weight: bold; color: #64748b; display: block; margin-top: 15px; text-transform: uppercase; }
-        input, select { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; }
+        input, select { width: 100%; padding: 12px; margin-top: 8px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
         .btn { padding: 12px; width: 100%; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; color: white; }
         .btn-blue { background: #007bff; }
         .btn-green { background: #10b981; }
         table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; }
         th, td { padding: 15px; text-align: left; border-bottom: 1px solid #f1f5f9; }
-        th { background: #f8fafc; font-size: 11px; }
-        #qrImage { width: 180px; height: 180px; margin: 20px auto; display: block; border: 1px solid #eee; padding: 10px; border-radius: 10px; }
+        th { background: #f8fafc; color: #64748b; font-size: 11px; text-transform: uppercase; }
+        #qrImage { width: 180px; margin: 20px auto; display: block; border: 1px solid #eee; border-radius: 10px; padding: 10px; }
     </style>
 </head>
 <body>
 
-    <!-- LOGIN SCREEN -->
     <div id="loginScreen" class="login-screen">
         <div class="login-card">
             <h2>TTU Admin</h2>
-            <input type="password" id="adminPass" placeholder="Enter Password">
+            <input type="password" id="adminPass" placeholder="System Password">
             <button class="btn btn-blue" onclick="verifyAdmin()">Login</button>
         </div>
     </div>
 
-    <!-- PROTECTED DASHBOARD -->
     <div id="adminWrapper">
         <div class="sidebar">
             <h2 style="color:#004085">TTU Dashboard</h2>
-            <label>Load Saved Class</label>
+            <label>Load History</label>
             <select id="classSelector" onchange="selectSavedClass()"></select>
             <hr style="margin:20px 0; border:0; border-top:1px solid #eee;">
             <label>Class ID</label>
             <input type="text" id="classIdInput" value="cs101" onchange="refresh()">
             <label>Course Name</label>
-            <input type="text" id="classNameInput" placeholder="eg. Business Law">
+            <input type="text" id="classNameInput" placeholder="eg. Advanced Java">
             <label>Date</label>
             <input type="date" id="dateFilter" onchange="refresh()">
             <img id="qrImage">
-            <button class="btn btn-blue" id="gpsBtn" onclick="updateRoomGPS()">📍 Set GPS & Start</button>
+            <button class="btn btn-blue" id="gpsBtn" onclick="updateRoomGPS()">📍 Set GPS & Start Class</button>
             <button class="btn btn-green" onclick="downloadCSV()">📥 Export CSV</button>
             <button class="btn" style="background:#64748b" onclick="location.reload()">Logout</button>
         </div>
         <div class="content">
             <h1>Attendance List (<span id="count">0</span>)</h1>
             <table>
-                <thead><tr><th>Time</th><th>Name</th><th>Index</th><th>Map</th></tr></thead>
+                <thead><tr><th>Time</th><th>Name</th><th>Index</th><th>Location</th></tr></thead>
                 <tbody id="list"></tbody>
             </table>
         </div>
@@ -94,6 +91,7 @@
             const cid = document.getElementById('classIdInput').value;
             const date = document.getElementById('dateFilter').value;
             document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent('https://ygideon75-cpu.github.io/attendance-system/?class='+cid)}`;
+            
             const start = `${date}T00:00:00.000Z`, end = `${date}T23:59:59.999Z`;
             const { data } = await supabase.from('attendance').select('*').eq('class_id', cid).gte('created_at', start).lte('created_at', end).order('created_at', {ascending: false});
             if (data) {
@@ -105,11 +103,11 @@
         window.updateRoomGPS = () => {
             const cid = document.getElementById('classIdInput').value;
             const cName = document.getElementById('classNameInput').value;
-            if(!cName) return alert("Enter Course Name!");
+            if(!cName) return alert("Please enter Course Name!");
             navigator.geolocation.getCurrentPosition(async (pos) => {
                 await supabase.from('classes').upsert({ id: cid, name: cName, lat: pos.coords.latitude, lng: pos.coords.longitude });
-                alert("GPS Set!"); loadClassHistory(); refresh();
-            }, (err) => alert("GPS Error"), {enableHighAccuracy:true});
+                alert("Room GPS set successfully!"); loadClassHistory(); refresh();
+            }, (err) => alert("GPS Error: " + err.message), {enableHighAccuracy:true});
         };
 
         window.downloadCSV = () => {
@@ -118,7 +116,7 @@
             const blob = new Blob([csv], { type: 'text/csv' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
-            link.download = `Attendance.csv`;
+            link.download = `Attendance_${document.getElementById('classIdInput').value}.csv`;
             link.click();
         };
 
