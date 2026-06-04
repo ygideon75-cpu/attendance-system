@@ -7,11 +7,11 @@
     <style>
         body { font-family: -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f1f5f9; }
         .card { background: white; padding: 2.5rem; border-radius: 1.5rem; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 90%; max-width: 400px; text-align: center; }
-        h2 { color: #1e293b; margin-top: 0; }
         input { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; box-sizing: border-box; font-size: 1rem; }
-        button { width: 100%; padding: 1rem; border: none; border-radius: 0.5rem; background: #007bff; color: white; font-weight: bold; cursor: pointer; font-size: 1rem; }
+        button { width: 100%; padding: 1rem; border: none; border-radius: 0.5rem; background: #007bff; color: white; font-weight: bold; cursor: pointer; }
         button:disabled { background: #cbd5e1; cursor: not-allowed; color: #64748b; }
         #status { font-size: 0.85rem; margin-top: 15px; font-weight: 600; color: #dc2626; }
+        .retry-btn { background: #64748b; font-size: 0.8rem; padding: 0.5rem; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -19,8 +19,9 @@
         <h2 id="title">Loading Class...</h2>
         <input type="text" id="name" placeholder="Full Name">
         <input type="text" id="index" placeholder="Index Number">
-        <div id="status">⏳ Verifying Identity...</div>
-        <button id="btn" onclick="submitAttendance()" disabled>OUT OF RANGE</button>
+        <div id="status">⏳ Requesting GPS...</div>
+        <button id="btn" onclick="submitAttendance()" disabled>WAITING FOR GPS</button>
+        <button id="retryBtn" class="retry-btn" style="display:none;" onclick="startGPS()">Allow GPS Access</button>
     </div>
 
     <script type="module">
@@ -31,7 +32,7 @@
         const classId = params.get('class') || 'cs101';
         const today = new Date().toISOString().split('T')[0];
 
-        // 1. HARDWARE FINGERPRINT (Anti-Cheat)
+        // Unique Hardware Fingerprint
         function getFingerprint() {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -41,22 +42,43 @@
         }
         const hardwareId = getFingerprint();
 
-        // 2. FETCH CLASS NAME & CHECK LOCK
         async function init() {
+            // Fetch the Class Name (e.g. "Biology")
             const { data: cData } = await supabase.from('classes').select('name').eq('id', classId).single();
             document.getElementById('title').innerText = cData?.name || "Class: " + classId.toUpperCase();
-
+            
+            // SECURITY CHECK: Only block if this Phone has scanned for THIS specific Class ID today
             const startOfDay = `${today}T00:00:00.000Z`;
-            const { data: lock } = await supabase.from('attendance').select('id').eq('device_id', hardwareId).eq('class_id', classId).gte('created_at', startOfDay);
+            const { data: lock } = await supabase.from('attendance')
+                .select('id')
+                .eq('device_id', hardwareId)
+                .eq('class_id', classId) 
+                .gte('created_at', startOfDay);
+
             if (lock && lock.length > 0) {
-                document.getElementById('mainCard').innerHTML = "<h2>✅ Already Marked</h2><p>This phone has already been used for this class today.</p>";
+                document.getElementById('mainCard').innerHTML = `<h2>✅ Already Marked</h2><p>You have already scanned for ${cData?.name || classId.toUpperCase()} today.</p>`;
             }
         }
         init();
 
         let sLat, sLng;
-        navigator.geolocation.watchPosition(async (pos) => {
-            sLat = pos.coords.latitude; sLng = pos.coords.longitude;
+        window.startGPS = () => {
+            document.getElementById('status').innerText = "⏳ Detecting location...";
+            navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                    sLat = pos.coords.latitude; sLng = pos.coords.longitude;
+                    document.getElementById('retryBtn').style.display = "none";
+                    verifyLocation();
+                },
+                (err) => {
+                    document.getElementById('status').innerText = "❌ GPS Error: Please allow location access.";
+                    document.getElementById('retryBtn').style.display = "block";
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        };
+
+        async function verifyLocation() {
             const { data: classLoc } = await supabase.from('classes').select('*').eq('id', classId).single();
             if (classLoc && classLoc.lat) {
                 const dist = getDist(sLat, sLng, classLoc.lat, classLoc.lng);
@@ -67,11 +89,12 @@
                     document.getElementById('btn').innerText = "Mark Present";
                 } else {
                     document.getElementById('status').innerText = `❌ Too Far (${Math.round(dist*1000)}m)`;
-                    document.getElementById('btn').disabled = true;
                     document.getElementById('btn').innerText = "OUT OF RANGE";
                 }
+            } else {
+                document.getElementById('status').innerText = "⚠️ Room location not set by teacher.";
             }
-        }, null, { enableHighAccuracy: true });
+        }
 
         function getDist(la1, lo1, la2, lo2) {
             const R = 6371; 
@@ -83,16 +106,22 @@
         window.submitAttendance = async () => {
             const name = document.getElementById('name').value;
             const index = document.getElementById('index').value;
-            if(!name || !index) return alert("Please fill all fields");
+            if(!name || !index) return alert("Fill fields");
 
             const btn = document.getElementById('btn');
-            btn.disabled = true; btn.innerText = "Verifying...";
+            btn.disabled = true; btn.innerText = "Saving...";
 
             const startOfDay = `${today}T00:00:00.000Z`;
-            const { data: indexCheck } = await supabase.from('attendance').select('id').eq('index_number', index).eq('class_id', classId).gte('created_at', startOfDay);
+            
+            // Check if Index Number already used for THIS CLASS today
+            const { data: indexCheck } = await supabase.from('attendance')
+                .select('id')
+                .eq('index_number', index)
+                .eq('class_id', classId)
+                .gte('created_at', startOfDay);
 
             if (indexCheck && indexCheck.length > 0) {
-                alert("This Index Number has already been used today!");
+                alert("This Index Number has already been used for this class today!");
                 btn.disabled = false; btn.innerText = "Mark Present";
                 return;
             }
@@ -101,13 +130,11 @@
                 student: name, index_number: index, class_id: classId, lat: sLat, lng: sLng, device_id: hardwareId 
             }]);
 
-            if (!error) {
-                document.getElementById('mainCard').innerHTML = "<h2>✅ Success!</h2>";
-            } else {
-                alert("Database Error: " + error.message);
-                btn.disabled = false;
-            }
+            if (!error) document.getElementById('mainCard').innerHTML = "<h2>✅ Success!</h2><p>Attendance recorded.</p>";
+            else alert("Error: " + error.message);
         };
+
+        startGPS();
     </script>
 </body>
 </html>
