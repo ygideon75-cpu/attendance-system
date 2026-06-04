@@ -14,4 +14,129 @@
         table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         th, td { padding: 15px; text-align: left; border-bottom: 1px solid #f1f5f9; }
         th { background: #f8fafc; color: #64748b; font-size: 12px; }
-        .btn { padding: 12px; width: 100%; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; color: white; transition:
+        .btn { padding: 12px; width: 100%; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; color: white; transition: 0.2s; }
+        .btn-blue { background: #007bff; }
+        .btn-green { background: #10b981; }
+        .map-link { color: #007bff; text-decoration: none; font-size: 12px; font-weight: bold; }
+        #qrImage { width: 200px; height: 200px; margin-top: 20px; border: 1px solid #f1f5f9; padding: 10px; border-radius: 10px; background: white; display: block; margin-left: auto; margin-right: auto; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>Dashboard</h2>
+        
+        <label>Class ID (e.g., cs101)</label>
+        <input type="text" id="classIdInput" value="cs101" onchange="refresh()">
+
+        <label>Display Name (e.g., Mathematics)</label>
+        <input type="text" id="classNameInput" placeholder="Enter Course Name">
+
+        <label>View Date</label>
+        <input type="date" id="dateFilter" onchange="refresh()">
+        
+        <img id="qrImage" alt="QR Code">
+        
+        <button class="btn btn-blue" id="gpsBtn" onclick="updateRoomGPS()">📍 Set Room GPS & Name</button>
+        <button class="btn btn-green" onclick="downloadCSV()">📥 Download CSV</button>
+    </div>
+
+    <div class="content">
+        <h1>Attendance List (<span id="count">0</span>)</h1>
+        <table>
+            <thead>
+                <tr><th>Time</th><th>Student Name</th><th>Index</th><th>Location</th></tr>
+            </thead>
+            <tbody id="list"></tbody>
+        </table>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+        
+        const supabase = createClient('https://tnscsgqogoqrwdohytki.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc2NzZ3FvZ29xcndkb2h5dGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MTcwMjQsImV4cCI6MjA5NTE5MzAyNH0.Xy-QKWBrYXIMP7M_lBmW4SnUxlBpnbm_Poatd8W5Ph4');
+
+        document.getElementById('dateFilter').value = new Date().toISOString().split('T')[0];
+
+        window.refresh = async () => {
+            const cid = document.getElementById('classIdInput').value;
+            const selectedDate = document.getElementById('dateFilter').value;
+            
+            // 1. Update QR Code
+            const studentUrl = `https://ygideon75-cpu.github.io/attendance-system/?class=${cid}`;
+            document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(studentUrl)}`;
+            
+            // 2. Fetch Attendance for selected class and date
+            const startOfDay = `${selectedDate}T00:00:00.000Z`;
+            const endOfDay = `${selectedDate}T23:59:59.999Z`;
+
+            const { data } = await supabase
+                .from('attendance')
+                .select('*')
+                .eq('class_id', cid)
+                .gte('created_at', startOfDay)
+                .lte('created_at', endOfDay)
+                .order('created_at', { ascending: false });
+
+            if (data) {
+                document.getElementById('count').innerText = data.length;
+                document.getElementById('list').innerHTML = data.map(d => `
+                    <tr>
+                        <td>${new Date(d.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
+                        <td><b>${d.student}</b></td>
+                        <td>${d.index_number}</td>
+                        <td><a href="https://www.google.com/maps?q=${d.lat},${d.lng}" target="_blank" class="map-link">📍 View Map</a></td>
+                    </tr>
+                `).join('') || "<tr><td colspan='4' style='text-align:center; padding: 40px; color: #94a3b8;'>No records found.</td></tr>";
+            }
+        };
+
+        window.updateRoomGPS = () => {
+            const btn = document.getElementById('gpsBtn');
+            const cid = document.getElementById('classIdInput').value;
+            const cName = document.getElementById('classNameInput').value;
+
+            if(!cName) return alert("Please enter a Class Display Name first!");
+
+            btn.innerText = "⏳ Saving...";
+            btn.disabled = true;
+
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const { error } = await supabase.from('classes').upsert({ 
+                    id: cid, 
+                    name: cName,
+                    lat: pos.coords.latitude, 
+                    lng: pos.coords.longitude 
+                });
+                
+                if (error) alert("Error: " + error.message);
+                else alert(`✅ ${cName} GPS set successfully!`);
+                btn.innerText = "📍 Set Room GPS & Name";
+                btn.disabled = false;
+            }, (err) => {
+                alert("GPS Error: " + err.message);
+                btn.disabled = false;
+            }, { enableHighAccuracy: true });
+        };
+
+        window.downloadCSV = () => {
+            let csv = "Time,Student,Index,Lat,Lng\n";
+            document.querySelectorAll("#list tr").forEach(tr => {
+                if(tr.cells.length > 1) {
+                    csv += `${tr.cells[0].innerText},${tr.cells[1].innerText.replace(',','')},${tr.cells[2].innerText}\n`;
+                }
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `attendance_${document.getElementById('classIdInput').value}.csv`;
+            link.click();
+        };
+
+        supabase.channel('db').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attendance' }, () => {
+            if(document.getElementById('dateFilter').value === new Date().toISOString().split('T')[0]) refresh();
+        }).subscribe();
+
+        refresh();
+    </script>
+</body>
+</html>
