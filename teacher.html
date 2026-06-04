@@ -6,43 +6,49 @@
     <title>Admin | TTU Attendance Portal</title>
     <style>
         #adminWrapper { display: none; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8fafc; margin: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f8fafc; margin: 0; }
         
         /* Login Screen */
         .login-screen { display: flex; justify-content: center; align-items: center; height: 100vh; background: #004085; }
         .login-card { background: white; padding: 2.5rem; border-radius: 1rem; width: 320px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
         
-        /* Main Dashboard Layout */
+        /* Sidebar Navigation */
         .sidebar { 
-            width: 320px; 
-            background: white; 
-            height: 100vh; 
-            padding: 25px; 
-            border-right: 1px solid #e2e8f0; 
-            position: fixed; 
-            box-sizing: border-box; 
-            overflow-y: auto; /* This allows you to scroll down if buttons are hidden */
+            width: 320px; background: white; height: 100vh; padding: 25px; border-right: 1px solid #e2e8f0; 
+            position: fixed; box-sizing: border-box; overflow-y: auto; transition: 0.3s; z-index: 1000;
         }
-        .content { margin-left: 320px; padding: 40px; flex-grow: 1; }
-        
-        /* Form Elements */
+
+        /* Mobile Menu Button (Hidden on Desktop) */
+        .menu-toggle {
+            display: none; position: fixed; top: 15px; left: 15px; 
+            background: #004085; color: white; border: none; padding: 10px 15px;
+            border-radius: 5px; font-weight: bold; cursor: pointer; z-index: 1100;
+        }
+
+        /* Main Content */
+        .content { margin-left: 320px; padding: 40px; flex-grow: 1; transition: 0.3s; }
+
+        /* Responsive Logic for Phones */
+        @media (max-width: 768px) {
+            .sidebar { left: -320px; width: 280px; box-shadow: 10px 0 15px rgba(0,0,0,0.1); }
+            .sidebar.active { left: 0; }
+            .content { margin-left: 0; padding: 20px; padding-top: 70px; }
+            .menu-toggle { display: block; }
+            .content h1 { font-size: 1.5rem; }
+        }
+
+        /* Elements */
         label { font-size: 11px; font-weight: bold; color: #64748b; display: block; margin-top: 15px; text-transform: uppercase; }
         input, select { width: 100%; padding: 12px; margin-top: 8px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-        
-        /* Buttons */
-        .btn { padding: 12px; width: 100%; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; color: white; transition: 0.2s; }
+        .btn { padding: 12px; width: 100%; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; color: white; }
         .btn-blue { background: #007bff; }
-        .btn-blue:hover { background: #0056b3; }
         .btn-green { background: #10b981; }
-        .btn-green:hover { background: #059669; }
-        .btn-gray { background: #64748b; margin-top: 30px; }
-
-        /* Table */
-        table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #f1f5f9; }
-        th { background: #f8fafc; color: #64748b; font-size: 11px; text-transform: uppercase; }
+        .btn-red { background: #64748b; }
         
-        #qrImage { width: 180px; margin: 20px auto; display: block; border: 1px solid #eee; border-radius: 10px; padding: 10px; background: white; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow-x: auto; display: block; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #f1f5f9; min-width: 100px; }
+        th { background: #f8fafc; color: #64748b; font-size: 11px; text-transform: uppercase; }
+        #qrImage { width: 100%; max-width: 180px; margin: 20px auto; display: block; border: 1px solid #eee; padding: 10px; border-radius: 10px; }
     </style>
 </head>
 <body>
@@ -51,16 +57,18 @@
     <div id="loginScreen" class="login-screen">
         <div class="login-card">
             <h2 style="color:#004085; margin-top:0;">TTU Admin</h2>
-            <p style="font-size: 13px; color: #64748b; margin-bottom: 20px;">Enter password to unlock dashboard</p>
             <input type="password" id="adminPass" placeholder="System Password">
             <button class="btn btn-blue" onclick="verifyAdmin()">Login</button>
         </div>
     </div>
 
-    <!-- 2. PROTECTED DASHBOARD CONTENT -->
+    <!-- 2. PROTECTED CONTENT -->
     <div id="adminWrapper">
-        <div class="sidebar">
+        <button class="menu-toggle" id="toggleBtn" onclick="toggleSidebar()">☰ MENU</button>
+
+        <div class="sidebar" id="sidebar">
             <h2 style="color:#004085; margin-top:0;">TTU Dashboard</h2>
+            <button class="btn btn-red" style="margin-top:0; display:none;" id="closeBtn" onclick="toggleSidebar()">✕ CLOSE MENU</button>
             
             <label>Load History</label>
             <select id="classSelector" onchange="selectSavedClass()"></select>
@@ -69,70 +77,60 @@
             
             <label>Class ID</label>
             <input type="text" id="classIdInput" value="cs101" onchange="refresh()">
-            
             <label>Course Name</label>
-            <input type="text" id="classNameInput" placeholder="eg. Advanced Java">
-            
+            <input type="text" id="classNameInput" placeholder="eg. Applied Thermodynamics">
             <label>Date</label>
             <input type="date" id="dateFilter" onchange="refresh()">
             
-            <img id="qrImage" alt="QR Code">
+            <img id="qrImage">
             
-            <button class="btn btn-blue" id="gpsBtn" onclick="updateRoomGPS()">📍 Set GPS & Start Class</button>
-            <button class="btn btn-green" onclick="downloadCSV()">📥 Export CSV Report</button>
-            
-            <button class="btn btn-gray" onclick="location.reload()">🔒 Logout</button>
+            <button class="btn btn-blue" id="gpsBtn" onclick="updateRoomGPS()">📍 Set GPS & Start</button>
+            <button class="btn btn-green" onclick="downloadCSV()">📥 Export CSV</button>
+            <button class="btn btn-red" onclick="location.reload()">🔒 Logout</button>
         </div>
 
         <div class="content">
-            <h1 style="margin-top:0;">Attendance List (<span id="count">0</span>)</h1>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Time</th>
-                        <th>Student Name</th>
-                        <th>Index</th>
-                        <th>Location</th>
-                    </tr>
-                </thead>
-                <tbody id="list">
-                    <!-- Data will appear here -->
-                </tbody>
-            </table>
+            <h1>Attendance Log (<span id="count">0</span>)</h1>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr><th>Time</th><th>Name</th><th>Index</th><th>Map</th></tr>
+                    </thead>
+                    <tbody id="list"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
     <script type="module">
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
-        
-        // Connect to your Supabase
         const supabase = createClient('https://tnscsgqogoqrwdohytki.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc2NzZ3FvZ29xcndkb2h5dGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MTcwMjQsImV4cCI6MjA5NTE5MzAyNH0.Xy-QKWBrYXIMP7M_lBmW4SnUxlBpnbm_Poatd8W5Ph4');
 
-        // Security Check
-        window.verifyAdmin = () => {
-            const passInput = document.getElementById('adminPass').value;
-            if (passInput === "TTUattendance@50") {
-                document.getElementById('loginScreen').style.display = "none";
-                document.getElementById('adminWrapper').style.display = "flex";
-                loadClassHistory(); 
-                refresh();
-            } else { 
-                alert("Wrong Password! Please try again."); 
-            }
+        // --- NEW: SIDEBAR TOGGLE FOR MOBILE ---
+        window.toggleSidebar = () => {
+            const sidebar = document.getElementById('sidebar');
+            const closeBtn = document.getElementById('closeBtn');
+            sidebar.classList.toggle('active');
+            closeBtn.style.display = sidebar.classList.contains('active') ? 'block' : 'none';
         };
 
-        // Initialize Date to Today
+        window.verifyAdmin = () => {
+            if (document.getElementById('adminPass').value === "TTUattendance@50") {
+                document.getElementById('loginScreen').style.display = "none";
+                document.getElementById('adminWrapper').style.display = "block";
+                loadClassHistory(); refresh();
+            } else { alert("Wrong Password!"); }
+        };
+
         document.getElementById('dateFilter').value = new Date().toISOString().split('T')[0];
 
-        // Load saved classes into dropdown
         async function loadClassHistory() {
             const { data } = await supabase.from('classes').select('id, name').order('name');
             const selector = document.getElementById('classSelector');
             selector.innerHTML = '<option value="">-- Choose Class --</option>';
             data?.forEach(c => {
                 const opt = document.createElement('option');
-                opt.value = c.id; 
-                opt.innerText = `${c.name} (${c.id})`;
+                opt.value = c.id; opt.innerText = `${c.name} (${c.id})`;
                 selector.appendChild(opt);
             });
         }
@@ -141,6 +139,8 @@
             const val = document.getElementById('classSelector').value;
             if (val) { 
                 document.getElementById('classIdInput').value = val; 
+                // Close sidebar on mobile after selecting
+                if(window.innerWidth < 768) toggleSidebar();
                 refresh(); 
             }
         };
@@ -148,84 +148,41 @@
         window.refresh = async () => {
             const cid = document.getElementById('classIdInput').value;
             const date = document.getElementById('dateFilter').value;
+            document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent('https://ygideon75-cpu.github.io/attendance-system/?class='+cid)}`;
             
-            // Update QR Code
-            const studentPage = `https://ygideon75-cpu.github.io/attendance-system/?class=${cid}`;
-            document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(studentPage)}`;
-            
-            // Query Supabase for attendance
-            const start = `${date}T00:00:00.000Z`;
-            const end = `${date}T23:59:59.999Z`;
-            
-            const { data } = await supabase.from('attendance')
-                .select('*')
-                .eq('class_id', cid)
-                .gte('created_at', start)
-                .lte('created_at', end)
-                .order('created_at', {ascending: false});
-
+            const start = `${date}T00:00:00.000Z`, end = `${date}T23:59:59.999Z`;
+            const { data } = await supabase.from('attendance').select('*').eq('class_id', cid).gte('created_at', start).lte('created_at', end).order('created_at', {ascending: false});
             if (data) {
                 document.getElementById('count').innerText = data.length;
-                document.getElementById('list').innerHTML = data.map(d => `
-                    <tr>
-                        <td>${new Date(d.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</td>
-                        <td><b>${d.student}</b></td>
-                        <td>${d.index_number}</td>
-                        <td><a href="https://www.google.com/maps?q=${d.lat},${d.lng}" target="_blank" style="color:#007bff; font-weight:bold; text-decoration:none;">📍 View Map</a></td>
-                    </tr>
-                `).join('') || "<tr><td colspan='4' style='text-align:center; padding: 40px; color: #94a3b8;'>No records found for this date.</td></tr>";
+                document.getElementById('list').innerHTML = data.map(d => `<tr><td>${new Date(d.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td><td><b>${d.student}</b></td><td>${d.index_number}</td><td><a href="https://www.google.com/maps?q=${d.lat},${d.lng}" target="_blank" style="color:#007bff; text-decoration:none;">📍 Map</a></td></tr>`).join('');
             }
         };
 
         window.updateRoomGPS = () => {
             const cid = document.getElementById('classIdInput').value;
             const cName = document.getElementById('classNameInput').value;
+            if(!cName) return alert("Enter Name!");
             const btn = document.getElementById('gpsBtn');
-
-            if(!cName) return alert("Please enter the Course Name!");
-
-            btn.innerText = "⏳ Capturing GPS...";
-            btn.disabled = true;
-
+            btn.innerText = "⏳ Locating...";
             navigator.geolocation.getCurrentPosition(async (pos) => {
-                const { error } = await supabase.from('classes').upsert({ 
-                    id: cid, 
-                    name: cName, 
-                    lat: pos.coords.latitude, 
-                    lng: pos.coords.longitude 
-                });
-                
-                if (error) alert("Error: " + error.message);
-                else {
-                    alert("✅ Room GPS set successfully! Students can now mark attendance.");
-                    loadClassHistory(); 
-                    refresh();
-                }
-                btn.innerText = "📍 Set GPS & Start Class";
-                btn.disabled = false;
-            }, (err) => {
-                alert("GPS Error: " + err.message);
-                btn.innerText = "📍 Set GPS & Start Class";
-                btn.disabled = false;
-            }, {enableHighAccuracy: true});
+                await supabase.from('classes').upsert({ id: cid, name: cName, lat: pos.coords.latitude, lng: pos.coords.longitude });
+                alert("GPS Set!"); 
+                if(window.innerWidth < 768) toggleSidebar();
+                loadClassHistory(); refresh();
+                btn.innerText = "📍 Set GPS & Start";
+            }, (err) => { alert("GPS Error"); btn.innerText = "📍 Set GPS & Start"; }, {enableHighAccuracy:true});
         };
 
         window.downloadCSV = () => {
-            const cid = document.getElementById('classIdInput').value;
             let csv = "Time,Name,Index\n";
-            document.querySelectorAll("#list tr").forEach(tr => { 
-                if (tr.cells.length > 1) {
-                    csv += `${tr.cells[0].innerText},${tr.cells[1].innerText.replace(',','')},${tr.cells[2].innerText}\n`;
-                }
-            });
+            document.querySelectorAll("#list tr").forEach(tr => { if (tr.cells.length > 1) csv += `${tr.cells[0].innerText},${tr.cells[1].innerText},${tr.cells[2].innerText}\n`; });
             const blob = new Blob([csv], { type: 'text/csv' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
-            link.download = `Attendance_${cid}.csv`;
+            link.download = `Attendance_${document.getElementById('classIdInput').value}.csv`;
             link.click();
         };
 
-        // Live Realtime Listeners
         supabase.channel('db').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attendance' }, () => refresh()).subscribe();
     </script>
 </body>
