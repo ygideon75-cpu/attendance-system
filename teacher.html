@@ -2,32 +2,64 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Prevents shaking and auto-zooming on mobile -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Admin | TTU Attendance Portal</title>
     <style>
         #adminWrapper { display: none; }
-        body { font-family: 'Segoe UI', sans-serif; background: #f8fafc; margin: 0; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: #f8fafc; margin: 0; padding: 0; width: 100%; overflow-x: hidden; }
+        
+        /* Login Screen */
         .login-screen { display: flex; justify-content: center; align-items: center; height: 100vh; background: #004085; }
-        .login-card { background: white; padding: 2.5rem; border-radius: 1rem; width: 320px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-        .sidebar { width: 320px; background: white; height: 100vh; padding: 25px; border-right: 1px solid #e2e8f0; position: fixed; box-sizing: border-box; overflow-y: auto; transition: 0.3s; z-index: 1000; }
-        .menu-toggle { display: none; position: fixed; top: 15px; left: 15px; background: #004085; color: white; border: none; padding: 10px 15px; border-radius: 5px; font-weight: bold; cursor: pointer; z-index: 1100; }
-        .content { margin-left: 320px; padding: 40px; flex-grow: 1; transition: 0.3s; }
-        @media (max-width: 768px) {
-            .sidebar { left: -320px; width: 280px; box-shadow: 10px 0 15px rgba(0,0,0,0.1); }
-            .sidebar.active { left: 0; }
-            .content { margin-left: 0; padding: 20px; padding-top: 70px; }
-            .menu-toggle { display: block; }
+        .login-card { background: white; padding: 2.5rem; border-radius: 1rem; width: 85%; max-width: 320px; text-align: center; }
+        
+        /* Stable Sidebar */
+        .sidebar { 
+            width: 300px; background: white; height: 100vh; padding: 25px; border-right: 1px solid #e2e8f0; 
+            position: fixed; top: 0; left: 0; box-sizing: border-box; overflow-y: auto; 
+            transition: transform 0.3s ease; z-index: 2000;
         }
+
+        /* Mobile Menu Toggle */
+        .menu-toggle {
+            display: none; position: fixed; bottom: 20px; right: 20px; 
+            background: #004085; color: white; border: none; width: 60px; height: 60px;
+            border-radius: 50%; font-weight: bold; cursor: pointer; z-index: 2100;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2); font-size: 24px;
+        }
+
+        /* Content Area */
+        .content { margin-left: 300px; padding: 40px; box-sizing: border-box; width: auto; }
+
+        /* Stable Mobile Adjustments */
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); width: 280px; }
+            .sidebar.active { transform: translateX(0); }
+            .content { margin-left: 0; padding: 20px; padding-bottom: 100px; width: 100%; }
+            .menu-toggle { display: block; }
+            .sidebar-overlay { 
+                display: none; position: fixed; top:0; left:0; width:100%; height:100%; 
+                background: rgba(0,0,0,0.5); z-index: 1500; 
+            }
+            .sidebar-overlay.active { display: block; }
+        }
+
+        /* Prevent Auto-Zoom: Font must be at least 16px */
         label { font-size: 11px; font-weight: bold; color: #64748b; display: block; margin-top: 15px; text-transform: uppercase; }
-        input, select { width: 100%; padding: 12px; margin-top: 8px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-family: inherit; }
-        .btn { padding: 12px; width: 100%; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; color: white; }
+        input, select { width: 100%; padding: 12px; margin-top: 8px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; background: white; }
+        
+        .btn { padding: 14px; width: 100%; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; color: white; font-size: 16px; }
         .btn-blue { background: #007bff; }
         .btn-green { background: #10b981; }
-        .btn-red { background: #64748b; }
-        table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #f1f5f9; }
+        .btn-red { background: #ef4444; }
+
+        /* Table Container (Prevents page stretch) */
+        .table-container { width: 100%; overflow-x: auto; background: white; border-radius: 12px; border: 1px solid #e2e8f0; }
+        table { width: 100%; border-collapse: collapse; min-width: 400px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
         th { background: #f8fafc; color: #64748b; font-size: 11px; text-transform: uppercase; }
-        #qrImage { width: 100%; max-width: 180px; margin: 20px auto; display: block; border: 1px solid #eee; padding: 10px; border-radius: 10px; }
+        
+        #qrImage { width: 180px; height: 180px; margin: 20px auto; display: block; border: 1px solid #eee; padding: 10px; border-radius: 10px; background: white; }
     </style>
 </head>
 <body>
@@ -35,20 +67,20 @@
     <div id="loginScreen" class="login-screen">
         <div class="login-card">
             <h2 style="color:#004085; margin-top:0;">TTU Admin</h2>
-            <input type="password" id="adminPass" placeholder="System Password">
+            <input type="password" id="adminPass" placeholder="Password">
             <button class="btn btn-blue" onclick="verifyAdmin()">Login</button>
         </div>
     </div>
 
     <div id="adminWrapper">
-        <button class="menu-toggle" onclick="toggleSidebar()">☰ MENU</button>
+        <div class="sidebar-overlay" id="overlay" onclick="toggleSidebar()"></div>
+        <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+
         <div class="sidebar" id="sidebar">
-            <h2 style="color:#004085; margin-top:0;">TTU Dashboard</h2>
-            <button class="btn btn-red" style="margin-top:10px; display:none;" id="closeBtn" onclick="toggleSidebar()">✕ CLOSE MENU</button>
+            <h2 style="color:#004085; margin:0;">Dashboard</h2>
             
             <label>Load History</label>
             <select id="classSelector" onchange="selectSavedClass()"></select>
-            
             <hr style="margin:20px 0; border:0; border-top:1px solid #eee;">
             
             <label>Class ID</label>
@@ -60,14 +92,14 @@
             
             <img id="qrImage">
             
-            <button class="btn btn-blue" id="gpsBtn" onclick="updateRoomGPS()">📍 Set GPS & Start</button>
+            <button class="btn btn-blue" id="gpsBtn" onclick="updateRoomGPS()">📍 Set GPS</button>
             <button class="btn btn-green" onclick="downloadCSV()">📥 Export CSV</button>
             <button class="btn btn-red" onclick="location.reload()">🔒 Logout</button>
         </div>
 
         <div class="content">
-            <h1>Attendance Log (<span id="count">0</span>)</h1>
-            <div style="overflow-x: auto;">
+            <h1>Attendance (<span id="count">0</span>)</h1>
+            <div class="table-container">
                 <table>
                     <thead><tr><th>Time</th><th>Name</th><th>Index</th><th>Map</th></tr></thead>
                     <tbody id="list"></tbody>
@@ -84,8 +116,7 @@
 
         window.toggleSidebar = () => {
             document.getElementById('sidebar').classList.toggle('active');
-            const isActive = document.getElementById('sidebar').classList.contains('active');
-            document.getElementById('closeBtn').style.display = isActive ? 'block' : 'none';
+            document.getElementById('overlay').classList.toggle('active');
         };
 
         window.verifyAdmin = () => {
@@ -93,7 +124,7 @@
                 document.getElementById('loginScreen').style.display = "none";
                 document.getElementById('adminWrapper').style.display = "block";
                 loadClassHistory(); refresh();
-            } else { alert("Wrong Password!"); }
+            } else { alert("Access Denied"); }
         };
 
         document.getElementById('dateFilter').value = new Date().toISOString().split('T')[0];
@@ -133,7 +164,7 @@
             const { data } = await supabase.from('attendance').select('*').eq('class_id', cid).gte('created_at', start).lte('created_at', end).order('created_at', {ascending: false});
             if (data) {
                 document.getElementById('count').innerText = data.length;
-                document.getElementById('list').innerHTML = data.map(d => `<tr><td>${new Date(d.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td><td><b>${d.student}</b></td><td>${d.index_number}</td><td><a href="https://www.google.com/maps?q=${d.lat},${d.lng}" target="_blank" style="color:#007bff; text-decoration:none;">📍 Map</a></td></tr>`).join('');
+                document.getElementById('list').innerHTML = data.map(d => `<tr><td>${new Date(d.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td><td><b>${d.student}</b></td><td>${d.index_number}</td><td><a href="https://www.google.com/maps?q=${d.lat},${d.lng}" target="_blank" style="color:#007bff; text-decoration:none;">📍 Map</a></td></tr>`).join('') || "<tr><td colspan='4' style='text-align:center'>No records</td></tr>";
             }
         };
 
@@ -148,8 +179,8 @@
                 alert("GPS & Name Saved!"); 
                 if(window.innerWidth < 768) toggleSidebar();
                 loadClassHistory(); refresh();
-                btn.innerText = "📍 Set GPS & Start";
-            }, (err) => { alert("GPS Error"); btn.innerText = "📍 Set GPS & Start"; }, {enableHighAccuracy:true});
+                btn.innerText = "📍 Set GPS";
+            }, (err) => { alert("GPS Error"); btn.innerText = "📍 Set GPS"; }, {enableHighAccuracy:true});
         };
 
         window.downloadCSV = () => {
