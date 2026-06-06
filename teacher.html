@@ -32,11 +32,9 @@
             -webkit-tap-highlight-color: transparent;
         }
 
-        /* --- Login Screen --- */
         .login-screen { display: flex; justify-content: center; align-items: center; height: 100dvh; background: linear-gradient(135deg, var(--ttu-blue) 0%, #001a35 100%); position: fixed; width: 100%; top: 0; left: 0; z-index: 9999; }
         .login-card { background: white; padding: 3rem 2rem; border-radius: 2rem; width: 85%; max-width: 350px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
 
-        /* --- Rock Solid Sidebar --- */
         .sidebar { 
             width: 310px; background: var(--ttu-sidebar); height: 100dvh; padding: 25px; border-right: 1px solid #e2e8f0; 
             position: fixed; top: 0; left: 0; box-sizing: border-box; 
@@ -54,7 +52,6 @@
             .menu-toggle { display: flex !important; }
         }
 
-        /* --- UI Components --- */
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-bottom: 25px; }
         .stat-card { background: white; padding: 18px; border-radius: 1.2rem; border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 12px; }
         
@@ -76,7 +73,7 @@
         .sidebar-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.4); z-index: 3500; backdrop-filter: blur(4px); touch-action: none; }
         .sidebar-overlay.active { display: block; }
 
-        #qrImage { width: 150px; height: 150px; margin: 20px auto; display: block; border-radius: 15px; padding: 5px; background: white; border: 1px solid #eee; }
+        #qrImage { width: 140px; height: 140px; margin: 20px auto; display: block; border-radius: 15px; padding: 5px; background: white; border: 1px solid #eee; }
         .pulse-dot { width: 8px; height: 8px; background: var(--ttu-success); border-radius: 50%; display: inline-block; animation: pulse 2s infinite; }
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
         
@@ -87,7 +84,6 @@
 </head>
 <body>
 
-    <!-- 1. LOGIN -->
     <div id="loginScreen" class="login-screen">
         <div class="login-card">
             <div style="font-size: 40px; margin-bottom: 10px;">🛡️</div>
@@ -97,21 +93,20 @@
         </div>
     </div>
 
-    <!-- 2. DASHBOARD -->
     <div id="adminWrapper">
         <div class="sidebar-overlay" id="overlay" onclick="toggleSidebar()"></div>
         <button class="menu-toggle" id="mBtn" onclick="toggleSidebar()"><i data-lucide="menu"></i></button>
 
         <div class="sidebar" id="sidebar">
-            <h3 style="color: var(--ttu-blue); margin:0 0 20px 0; display: flex; align-items: center; gap: 8px;"><i data-lucide="award"></i> Admin Panel</h3>
+            <h3 style="color: var(--ttu-blue); margin:0 0 20px 0; display: flex; align-items: center; gap: 8px;"><i data-lucide="award"></i> Admin Portal</h3>
             
-            <label>Level & Department</label>
+            <label>Level & Dept</label>
             <select id="levelInput" onchange="contextChanged()"><option>100</option><option>200</option><option selected>300</option><option>400</option></select>
             <select id="deptInput" onchange="contextChanged()"><option>Mechanical</option><option>Electrical</option><option>Civil</option><option>Petroleum</option></select>
 
             <hr style="margin:20px 0; border: 0; border-top: 1px solid #f1f5f9;">
             
-            <label>Load History</label>
+            <label>Saved History</label>
             <select id="courseHistorySelector" onchange="loadCourseFromHistory()"></select>
             
             <label>Course Name</label>
@@ -121,19 +116,14 @@
             <select id="sectionInput" onchange="autoLoadLecturer(); refresh();"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option></select>
             <input type="text" id="lecturerNameInput" placeholder="Lecturer Name">
 
-            <label>Select Date</label>
+            <label>Attendance Date</label>
             <input type="date" id="dateFilter" onchange="switchMode('daily')">
             
-            <!-- QR CODE -->
             <img id="qrImage" alt="QR Code">
             
-            <button class="btn btn-blue" id="gpsBtn" onclick="updateRoomGPS()"><i data-lucide="map-pin"></i> Sync Room GPS</button>
-            
-            <hr style="margin:20px 0; border: 0; border-top: 1px solid #f1f5f9;">
-            
-            <label>Reporting</label>
+            <button class="btn btn-blue" id="gpsBtn" onclick="updateRoomGPS()"><i data-lucide="map-pin"></i> Sync GPS</button>
             <button class="btn btn-gold" onclick="switchMode('semester')"><i data-lucide="layers"></i> Semester Compiler</button>
-            <button class="btn btn-green" onclick="downloadCSV()"><i data-lucide="file-text"></i> Export View</button>
+            <button class="btn btn-green" onclick="downloadCSV()"><i data-lucide="file-text"></i> Export CSV</button>
             <button class="btn btn-red" onclick="location.reload()">🔒 Logout</button>
         </div>
 
@@ -141,23 +131,16 @@
             <div class="stats-grid">
                 <div class="stat-card">
                     <div style="background: #e0f2fe; color: #0369a1; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;"><i data-lucide="users" size="20"></i></div>
-                    <div><label style="margin:0" id="countLabel">Present Today</label><div style="font-size: 22px; font-weight: 800;" id="count">0</div></div>
+                    <div><label style="margin:0" id="countLabel">Present</label><div style="font-size: 22px; font-weight: 800;" id="count">0</div></div>
                 </div>
                 <div class="stat-card">
                     <div style="background: #dcfce7; color: #15803d; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;"><i data-lucide="radio" size="20"></i></div>
-                    <div><label style="margin:0">Monitoring</label><div id="modeDisplay" class="mode-badge mode-daily">Daily</div></div>
+                    <div><label style="margin:0">Status</label><div id="modeDisplay" class="mode-badge mode-daily">Live</div></div>
                 </div>
             </div>
-
-            <h2 id="mainTitle" style="margin:0 0 5px; color: var(--ttu-blue); font-size: 22px;">Attendance Log</h2>
-            <p id="subTitle" style="color:#64748b; margin-bottom: 25px; font-size: 13px; font-weight: 500;"></p>
-            
-            <div class="table-container">
-                <table id="attendanceTable">
-                    <thead><tr id="tableHeader"><th>Time</th><th>Student Name</th><th>Index No.</th><th>Status</th></tr></thead>
-                    <tbody id="list"></tbody>
-                </table>
-            </div>
+            <h2 id="mainTitle" style="margin:0 0 5px; color: var(--ttu-blue); font-size: 22px;">Attendance</h2>
+            <p id="subTitle" style="color:#64748b; margin-bottom: 25px; font-size: 13px;"></p>
+            <div class="table-container"><table id="attendanceTable"><thead><tr id="tableHeader"><th>Time</th><th>Name</th><th>Index</th><th>Status</th></tr></thead><tbody id="list"></tbody></table></div>
         </div>
     </div>
 
@@ -171,8 +154,7 @@
         window.toggleSidebar = () => {
             const isAct = document.getElementById('sidebar').classList.toggle('active');
             document.getElementById('overlay').classList.toggle('active');
-            if (isAct) document.body.classList.add('menu-open');
-            else document.body.classList.remove('menu-open');
+            document.body.classList.toggle('menu-open', isAct);
             document.getElementById('mBtn').innerHTML = isAct ? '<i data-lucide="x"></i>' : '<i data-lucide="menu"></i>';
             lucide.createIcons();
         };
@@ -181,25 +163,20 @@
             if (document.getElementById('adminPass').value === "TTUattendance@50") {
                 document.getElementById('loginScreen').style.display = "none";
                 document.getElementById('adminWrapper').style.display = "block";
-                loadAllClassesFromDB(); 
-                lucide.createIcons();
+                loadAllClassesFromDB(); refresh(); lucide.createIcons();
             } else alert("Denied");
         };
 
-        // Initialize Date
-        const todayStr = new Date().toISOString().split('T')[0];
-        document.getElementById('dateFilter').value = todayStr;
+        // Fix: Better local date picker initialization
+        const now = new Date();
+        const localDate = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        document.getElementById('dateFilter').value = localDate;
 
-        window.contextChanged = () => { 
-            document.getElementById('classNameInput').value = ""; 
-            document.getElementById('lecturerNameInput').value = ""; 
-            updateHistoryList(); 
-            switchMode('daily'); 
-        };
+        window.contextChanged = () => { document.getElementById('classNameInput').value = ""; document.getElementById('lecturerNameInput').value = ""; updateHistoryList(); switchMode('daily'); };
 
         async function loadAllClassesFromDB() {
             const { data } = await supabase.from('classes').select('*').order('name');
-            if (data) { allSavedClasses = data; updateHistoryList(); refresh(); }
+            if (data) { allSavedClasses = data; updateHistoryList(); }
         }
 
         window.updateHistoryList = () => {
@@ -207,7 +184,7 @@
             const matches = allSavedClasses.filter(c => c.level === level && c.department === dept);
             const uniqueNames = [...new Set(matches.map(c => c.name))];
             const sel = document.getElementById('courseHistorySelector');
-            sel.innerHTML = uniqueNames.length > 0 ? '<option value="">-- Select Course --</option>' : '<option value="">-- No matches --</option>';
+            sel.innerHTML = uniqueNames.length > 0 ? '<option value="">-- Select --</option>' : '<option value="">-- Empty --</option>';
             uniqueNames.forEach(n => { const o = document.createElement('option'); o.value = n; o.innerText = n; sel.appendChild(o); });
         };
 
@@ -217,45 +194,43 @@
         };
 
         window.autoLoadLecturer = () => {
-            const n = document.getElementById('classNameInput').value, s = document.getElementById('sectionInput').value, l = document.getElementById('levelInput').value, d = document.getElementById('deptInput').value;
+            const n = document.getElementById('classNameInput').value.trim();
+            const s = document.getElementById('sectionInput').value;
+            const l = document.getElementById('levelInput').value;
+            const d = document.getElementById('deptInput').value;
             if (!n) return;
             const match = allSavedClasses.find(c => c.name === n && c.section === s && c.level === l && c.department === d);
-            if (match) document.getElementById('lecturerNameInput').value = match.lecturer_name;
-            else { const generic = allSavedClasses.find(c => c.name === n && c.level === l && c.department === d); document.getElementById('lecturerNameInput').value = generic ? generic.lecturer_name : ""; }
+            document.getElementById('lecturerNameInput').value = match ? match.lecturer_name : (allSavedClasses.find(c => c.name === n)?.lecturer_name || "");
             refresh();
         };
 
         window.switchMode = (mode) => {
             currentMode = mode;
-            const display = document.getElementById('modeDisplay');
-            if (mode === 'daily') {
-                display.innerText = "Daily"; display.className = "mode-badge mode-daily";
-                document.getElementById('countLabel').innerText = "Present Today";
-                document.getElementById('tableHeader').innerHTML = "<th>Time</th><th>Student Name</th><th>Index No.</th><th>Status</th>";
-            } else {
-                display.innerText = "Semester"; display.className = "mode-badge mode-semester";
-                document.getElementById('countLabel').innerText = "Unique Total";
-                document.getElementById('tableHeader').innerHTML = "<th>Rank</th><th>Student Name</th><th>Index No.</th><th>Total Presence</th>";
-            }
+            document.getElementById('modeDisplay').innerText = mode === 'daily' ? "Daily" : "Semester";
+            document.getElementById('modeDisplay').className = `mode-badge mode-${mode}`;
+            document.getElementById('tableHeader').innerHTML = mode === 'daily' ? "<th>Time</th><th>Name</th><th>Index</th><th>Status</th>" : "<th>Rank</th><th>Name</th><th>Index</th><th>Presence</th>";
             if(window.innerWidth < 1024 && mode === 'semester') toggleSidebar();
             refresh();
         }
 
         window.refresh = async () => {
-            const l = document.getElementById('levelInput').value, d = document.getElementById('deptInput').value, c = document.getElementById('classNameInput').value, s = document.getElementById('sectionInput').value, dt = document.getElementById('dateFilter').value;
-            const cid = `${d}_${l}_${c.replace(/\s+/g, '_')}_${s}`.toLowerCase();
+            const l = document.getElementById('levelInput').value, d = document.getElementById('deptInput').value, 
+                  c = document.getElementById('classNameInput').value.trim(), s = document.getElementById('sectionInput').value, 
+                  dt = document.getElementById('dateFilter').value;
             
-            // Update QR Code
+            const cid = `${d}_${l}_${c.replace(/\s+/g, '_')}_${s}`.toLowerCase();
             const studentUrl = `https://ttu-attendance-portal.github.io/attendance-system/?class=${cid}`;
             document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(studentUrl)}`;
             
             if (!c) return;
 
             if (currentMode === 'daily') {
-                const st = `${dt}T00:00:00.000Z`, en = `${dt}T23:59:59.999Z`;
-                const { data } = await supabase.from('attendance').select('*').eq('class_id', cid).gte('created_at', st).lte('created_at', en).order('created_at', {ascending: false});
+                // Fix: Ensure we capture the full range of the selected local day
+                const start = dt + 'T00:00:00Z';
+                const end = dt + 'T23:59:59Z';
+                const { data } = await supabase.from('attendance').select('*').eq('class_id', cid).gte('created_at', start).lte('created_at', end).order('created_at', {ascending: false});
                 document.getElementById('count').innerText = data ? data.length : 0;
-                document.getElementById('list').innerHTML = data?.map(x => `<tr><td style="color:#64748b; font-size:12px;">${new Date(x.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td><td><b>${x.student}</b></td><td><code>${x.index_number}</code></td><td><span class="mode-badge mode-daily">Verified</span></td></tr>`).join('') || "<tr><td colspan='4' style='text-align:center; padding:40px;'>No records found.</td></tr>";
+                document.getElementById('list').innerHTML = data?.map(x => `<tr><td>${new Date(x.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td><td><b>${x.student}</b></td><td><code>${x.index_number}</code></td><td><span class="mode-badge mode-daily">Verified</span></td></tr>`).join('') || "<tr><td colspan='4' style='text-align:center; padding:40px;'>No records found.</td></tr>";
             } else {
                 const { data } = await supabase.from('attendance').select('student, index_number').eq('class_id', cid);
                 const summary = {};
@@ -265,29 +240,30 @@
                 });
                 const sorted = Object.entries(summary).sort((a, b) => b[1].count - a[1].count);
                 document.getElementById('count').innerText = sorted.length;
-                document.getElementById('list').innerHTML = sorted.map(([index, info], i) => `<tr><td>#${i+1}</td><td><b>${info.name}</b></td><td><code>${index}</code></td><td><span style="font-weight:bold; color:var(--ttu-blue)">${info.count} Weeks</span></td></tr>`).join('') || "<tr><td colspan='4' style='text-align:center; padding:40px;'>No compilation data.</td></tr>";
+                document.getElementById('list').innerHTML = sorted.map(([index, info], i) => `<tr><td>#${i+1}</td><td><b>${info.name}</b></td><td><code>${index}</code></td><td><span style="font-weight:bold; color:var(--ttu-blue)">${info.count} Days</span></td></tr>`).join('') || "<tr><td colspan='4' style='text-align:center; padding:40px;'>No data.</td></tr>";
             }
             
-            document.getElementById('mainTitle').innerText = c || "Attendance Log";
-            document.getElementById('subTitle').innerText = `${d} | L${l} | Sec ${s} | ${document.getElementById('lecturerNameInput').value}`;
+            document.getElementById('mainTitle').innerText = c;
+            document.getElementById('subTitle').innerText = `${d} | L${l} | Sec ${s}`;
             lucide.createIcons();
         };
 
         window.updateRoomGPS = () => {
-            const l = document.getElementById('levelInput').value, d = document.getElementById('deptInput').value, c = document.getElementById('classNameInput').value, s = document.getElementById('sectionInput').value, lec = document.getElementById('lecturerNameInput').value;
+            const l = document.getElementById('levelInput').value, d = document.getElementById('deptInput').value, 
+                  c = document.getElementById('classNameInput').value.trim(), s = document.getElementById('sectionInput').value, 
+                  lec = document.getElementById('lecturerNameInput').value.trim();
             if(!c || !lec) return alert("Fill course and lecturer details!");
             const cid = `${d}_${l}_${c.replace(/\s+/g, '_')}_${s}`.toLowerCase();
-            const btn = document.getElementById('gpsBtn'); btn.innerHTML = "⏳ Syncing GPS..."; btn.disabled = true;
+            const btn = document.getElementById('gpsBtn'); btn.innerHTML = "⏳ Syncing..."; btn.disabled = true;
             navigator.geolocation.getCurrentPosition(async (p) => {
                 await supabase.from('classes').upsert({ id: cid, name: c, department: d, level: l, section: s, lecturer_name: lec, lat: p.coords.latitude, lng: p.coords.longitude });
-                alert("Room GPS Updated!"); if(window.innerWidth < 1024) toggleSidebar(); loadAllClassesFromDB(); btn.innerHTML = '<i data-lucide="map-pin"></i> Sync Room GPS'; btn.disabled = false;
-                lucide.createIcons();
+                alert("GPS Sync Successful!"); if(window.innerWidth < 1024) toggleSidebar(); loadAllClassesFromDB(); refresh(); btn.innerHTML = '<i data-lucide="map-pin"></i> Sync GPS'; btn.disabled = false;
             }, (e) => { alert("GPS Lock Failed."); btn.disabled = false; }, {enableHighAccuracy:true});
         };
 
         window.downloadCSV = () => {
             const c = document.getElementById('classNameInput').value || "Report";
-            let csv = currentMode === 'semester' ? "Index,Name,Attendance_Weeks\n" : "Time,Name,Index\n";
+            let csv = currentMode === 'semester' ? "Index,Name,Attendance_Count\n" : "Time,Name,Index\n";
             document.querySelectorAll("#list tr").forEach(tr => { 
                 if (tr.cells.length > 1) {
                     if (currentMode === 'semester') csv += `${tr.cells[2].innerText},${tr.cells[1].innerText.replace(',','')},${tr.cells[3].innerText.split(' ')[0]}\n`;
