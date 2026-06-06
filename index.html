@@ -2,177 +2,124 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Student Portal | TTU Attendance</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- PWA / App Mode Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#004085">
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root { --ttu-blue: #004085; --ttu-gold: #ffc107; --bg: #f1f5f9; }
-        body { font-family: 'Inter', sans-serif; background: var(--bg); margin: 0; display: flex; flex-direction: column; min-height: 100vh; }
-        
-        /* Professional Header */
-        .header { background: var(--ttu-blue); color: white; padding: 1.5rem; text-align: center; border-bottom: 4px solid var(--ttu-gold); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .header h1 { margin: 0; font-size: 1.2rem; letter-spacing: 1px; }
-
+        body { font-family: 'Inter', sans-serif; background: var(--bg); margin: 0; display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden; }
+        .header { background: var(--ttu-blue); color: white; padding: 1.2rem; text-align: center; border-bottom: 4px solid var(--ttu-gold); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .header h1 { margin: 0; font-size: 1rem; letter-spacing: 1px; text-transform: uppercase; }
         .container { flex: 1; display: flex; justify-content: center; align-items: center; padding: 20px; }
-        
-        .card { background: white; padding: 2.5rem; border-radius: 1.5rem; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 100%; max-width: 400px; box-sizing: border-box; }
-        .card h2 { margin: 0 0 0.5rem; color: var(--ttu-blue); text-align: center; font-size: 1.4rem; }
-        .card p { text-align: center; color: #64748b; font-size: 0.9rem; margin-bottom: 2rem; }
-
+        .card { background: white; padding: 2.5rem; border-radius: 1.5rem; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 100%; max-width: 400px; box-sizing: border-box; text-align: center; }
+        h2 { color: var(--ttu-blue); margin: 0 0 0.5rem; font-size: 1.3rem; }
+        p { color: #64748b; font-size: 0.85rem; margin-bottom: 2rem; }
         .form-group { margin-bottom: 1.2rem; text-align: left; }
-        label { display: block; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 0.5rem; }
-        input { width: 100%; padding: 0.85rem; border: 1px solid #e2e8f0; border-radius: 0.6rem; box-sizing: border-box; font-size: 1rem; transition: all 0.2s; }
+        label { display: block; font-size: 0.7rem; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 0.5rem; }
+        input { width: 100%; padding: 0.9rem; border: 1px solid #e2e8f0; border-radius: 0.7rem; box-sizing: border-box; font-size: 16px; transition: all 0.2s; }
         input:focus { border-color: var(--ttu-blue); outline: none; box-shadow: 0 0 0 3px rgba(0,64,133,0.1); }
-
-        .btn-submit { width: 100%; padding: 1rem; border: none; border-radius: 0.6rem; background: var(--ttu-blue); color: white; font-weight: 700; cursor: pointer; font-size: 1rem; transition: 0.3s; margin-top: 10px; }
+        .btn-submit { width: 100%; padding: 1rem; border: none; border-radius: 0.7rem; background: var(--ttu-blue); color: white; font-weight: 700; cursor: pointer; font-size: 1rem; transition: 0.3s; margin-top: 10px; }
         .btn-submit:disabled { background: #cbd5e1; cursor: not-allowed; }
-
-        #status-msg { margin-top: 1.5rem; padding: 1rem; border-radius: 0.6rem; font-size: 0.85rem; font-weight: 600; text-align: center; }
-        .error { background: #fef2f2; color: #dc2626; border: 1px solid #fee2e2; }
-        .success { background: #f0fdf4; color: #16a34a; border: 1px solid #dcfce7; }
-
+        #status-msg { margin-top: 1.5rem; padding: 0.8rem; border-radius: 0.6rem; font-size: 0.8rem; font-weight: 600; text-align: center; }
+        .error { background: #fef2f2; color: #dc2626; }
+        .success { background: #f0fdf4; color: #16a34a; }
         .footer { padding: 1.5rem; text-align: center; font-size: 0.7rem; color: #94a3b8; line-height: 1.5; }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <h1>TAKORADI TECHNICAL UNIVERSITY</h1>
-</div>
+<div class="header"><h1>Takoradi Technical University</h1></div>
 
 <div class="container">
     <div class="card" id="main-content">
-        <h2 id="class-title">Loading Session...</h2>
-        <p>Confirm your attendance for this lecture.</p>
+        <h2 id="class-title">Verifying Session...</h2>
+        <p>Enter your academic details to sign in.</p>
         
         <div class="form-group">
-            <label>Student Full Name</label>
-            <input type="text" id="name" placeholder="Enter your name">
+            <label>Full Student Name</label>
+            <input type="text" id="name" placeholder="eg. John Mensah">
         </div>
 
         <div class="form-group">
             <label>Index Number</label>
-            <input type="text" id="index" placeholder="Enter index number">
+            <input type="text" id="index" placeholder="eg. 01234567">
         </div>
 
         <button id="submit-btn" class="btn-submit" onclick="submitAttendance()" disabled>Verifying Location...</button>
-        
-        <div id="status-msg" class="error">⏳ Requesting GPS...</div>
+        <div id="status-msg" class="error">⏳ Initializing Secure GPS...</div>
     </div>
 </div>
 
-<div class="footer">
-    OFFICIAL TTU ATTENDANCE PORTAL<br>
-    Secure Identity & Geofencing System Active.
-</div>
+<div class="footer">OFFICIAL TTU ATTENDANCE PORTAL<br>&copy; 2024 Faculty of Engineering</div>
 
 <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
-    
-    // --- CONNECT TO YOUR SUPABASE ---
     const supabase = createClient('https://tnscsgqogoqrwdohytki.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc2NzZ3FvZ29xcndkb2h5dGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MTcwMjQsImV4cCI6MjA5NTE5MzAyNH0.Xy-QKWBrYXIMP7M_lBmW4SnUxlBpnbm_Poatd8W5Ph4');
 
     const params = new URLSearchParams(window.location.search);
     const classId = params.get('class') || 'none';
     const today = new Date().toISOString().split('T')[0];
 
-    // Hardware Fingerprint (Prevents clearing cache to sign for friends)
-    function getDeviceID() {
+    // Hardware ID (Anti-Cheat)
+    function getHardwareID() {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         ctx.textBaseline = "top"; ctx.font = "12px 'Arial'";
-        ctx.fillText("TTU_SECURE_ID", 2, 2);
+        ctx.fillText("TTU_SEC_ID", 2, 2);
         return btoa(canvas.toDataURL());
     }
-    const deviceId = getDeviceID();
+    const deviceId = getHardwareID();
 
-    async function checkStatus() {
-        // Get Class Name
-        const { data: cData } = await supabase.from('classes').select('name').eq('id', classId).single();
-        document.getElementById('class-title').innerText = cData?.name || "Class: " + classId.toUpperCase();
-
-        // Check for Device Lock (One student per phone per day)
-        const startOfDay = `${today}T00:00:00.000Z`;
-        const { data: lock } = await supabase.from('attendance')
-            .select('id')
-            .eq('device_id', deviceId)
-            .eq('class_id', classId)
-            .gte('created_at', startOfDay);
-
-        if (lock && lock.length > 0) {
-            document.getElementById('main-content').innerHTML = `
-                <div style="text-align:center">
-                    <h2 style="color:#16a34a">✅ Verified</h2>
-                    <p>Your attendance for <b>${cData?.name || classId}</b> has already been recorded for today.</p>
-                </div>`;
-        }
+    async function init() {
+        const { data } = await supabase.from('classes').select('name').eq('id', classId).single();
+        document.getElementById('class-title').innerText = data?.name || "Attendance Sign-in";
+        
+        const { data: lock } = await supabase.from('attendance').select('id').eq('device_id', deviceId).eq('class_id', classId).gte('created_at', today + 'T00:00:00Z');
+        if (lock?.length > 0) document.getElementById('main-content').innerHTML = "<h2>✅ Verified</h2><p>Attendance already recorded for today.</p>";
     }
-    checkStatus();
+    init();
 
     let sLat, sLng;
     navigator.geolocation.watchPosition(async (pos) => {
         sLat = pos.coords.latitude; sLng = pos.coords.longitude;
         const { data: loc } = await supabase.from('classes').select('*').eq('id', classId).single();
-        
-        if (loc && loc.lat) {
+        if (loc?.lat) {
             const dist = getDist(sLat, sLng, loc.lat, loc.lng);
             const status = document.getElementById('status-msg');
             const btn = document.getElementById('submit-btn');
-            
-            if (dist <= 0.1) { // 100 Meter Radius
-                status.innerText = "📍 Within Classroom Range";
-                status.className = "success";
-                btn.disabled = false;
-                btn.innerText = "Confirm Attendance";
+            if (dist <= 0.1) { // 100m
+                status.innerText = "📍 Location Verified"; status.className = "success";
+                btn.disabled = false; btn.innerText = "Confirm Attendance";
             } else {
-                status.innerText = `❌ Too Far (${Math.round(dist*1000)}m away)`;
-                status.className = "error";
-                btn.disabled = true;
-                btn.innerText = "OUT OF RANGE";
+                status.innerText = `❌ Outside Range (${Math.round(dist*1000)}m)`; status.className = "error";
+                btn.disabled = true; btn.innerText = "Out of Range";
             }
         }
-    }, (err) => {
-        document.getElementById('status-msg').innerText = "❌ Please allow GPS access in settings.";
-    }, { enableHighAccuracy: true });
+    }, null, { enableHighAccuracy: true });
 
     function getDist(la1, lo1, la2, lo2) {
-        const R = 6371; 
-        const dLat = (la2-la1)*Math.PI/180; const dLon = (lo2-lo1)*Math.PI/180;
+        const R = 6371; const dLat = (la2-la1)*Math.PI/180; const dLon = (lo2-lo1)*Math.PI/180;
         const a = Math.sin(dLat/2)**2 + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLon/2)**2;
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
     window.submitAttendance = async () => {
-        const name = document.getElementById('name').value;
-        const index = document.getElementById('index').value;
-        if(!name || !index) return alert("Please fill in your details.");
+        const name = document.getElementById('name').value, index = document.getElementById('index').value;
+        if(!name || !index) return alert("Please fill all fields");
 
-        const btn = document.getElementById('submit-btn');
-        btn.disabled = true; btn.innerText = "Processing...";
+        const { data: check } = await supabase.from('attendance').select('id').eq('index_number', index).eq('class_id', classId).gte('created_at', today + 'T00:00:00Z');
+        if (check?.length > 0) return alert("Index number already signed in!");
 
-        const startOfDay = `${today}T00:00:00.000Z`;
-        const { data: indexCheck } = await supabase.from('attendance').select('id').eq('index_number', index).eq('class_id', classId).gte('created_at', startOfDay);
-
-        if (indexCheck && indexCheck.length > 0) {
-            alert("This Index Number has already been used today!");
-            btn.disabled = false; btn.innerText = "Confirm Attendance";
-            return;
-        }
-
-        const { error } = await supabase.from('attendance').insert([{ 
-            student: name, index_number: index, class_id: classId, lat: sLat, lng: sLng, device_id: deviceId 
-        }]);
-
-        if (!error) {
-            document.getElementById('main-content').innerHTML = `
-                <div style="text-align:center">
-                    <h2 style="color:#16a34a">✅ Success</h2>
-                    <p>Thank you, ${name}. Your attendance is secured.</p>
-                </div>`;
-        } else {
-            alert("Error: " + error.message);
-            btn.disabled = false;
-        }
+        const { error } = await supabase.from('attendance').insert([{ student: name, index_number: index, class_id: classId, lat: sLat, lng: sLng, device_id: deviceId }]);
+        if (!error) document.getElementById('main-content').innerHTML = "<h2>✅ Success</h2><p>Attendance record secured.</p>";
     };
 </script>
 </body>
