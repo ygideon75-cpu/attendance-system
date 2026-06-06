@@ -24,7 +24,15 @@
         }
 
         #adminWrapper { display: none; }
-        body.menu-open { overflow: hidden; position: fixed; width: 100%; }
+        
+        /* FIX: Prevents background from moving at all when menu is open */
+        body.menu-open { 
+            overflow: hidden !important; 
+            touch-action: none; 
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
 
         body { 
             font-family: 'Inter', sans-serif; background: var(--ttu-bg); margin: 0; 
@@ -32,26 +40,31 @@
         }
 
         /* --- Login Screen --- */
-        .login-screen { display: flex; justify-content: center; align-items: center; height: 100vh; background: linear-gradient(135deg, var(--ttu-blue) 0%, #001a35 100%); position: fixed; width: 100%; top: 0; left: 0; z-index: 9999; }
+        .login-screen { display: flex; justify-content: center; align-items: center; height: 100dvh; background: linear-gradient(135deg, var(--ttu-blue) 0%, #001a35 100%); position: fixed; width: 100%; top: 0; left: 0; z-index: 9999; }
         .login-card { background: white; padding: 3rem 2rem; border-radius: 2rem; width: 85%; max-width: 350px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
 
-        /* --- Stable Sidebar --- */
+        /* --- SMOOTH STABLE SIDEBAR --- */
         .sidebar { 
-            width: 310px; background: var(--ttu-sidebar); height: 100vh; padding: 25px; border-right: 1px solid #e2e8f0; 
-            position: fixed; top: 0; left: 0; box-sizing: border-box; overflow-y: auto; 
-            transform: translate3d(0, 0, 0); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 4000;
+            width: 310px; background: var(--ttu-sidebar); height: 100dvh; padding: 25px; border-right: 1px solid #e2e8f0; 
+            position: fixed; top: 0; left: 0; box-sizing: border-box; 
+            overflow-y: auto; /* Enable vertical scroll */
+            -webkit-overflow-scrolling: touch; /* Momentum scrolling for iOS */
+            transform: translate3d(0, 0, 0); /* Hardware Acceleration */
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); 
+            z-index: 4000;
+            will-change: transform;
         }
 
         .content { margin-left: 310px; padding: 40px; transition: 0.3s ease; }
 
         @media (max-width: 1024px) {
-            .sidebar { transform: translate3d(-100%, 0, 0); }
+            .sidebar { transform: translate3d(-100%, 0, 0); width: 290px; }
             .sidebar.active { transform: translate3d(0, 0, 0); box-shadow: 20px 0 50px rgba(0,0,0,0.2); }
             .content { margin-left: 0; padding: 20px; padding-top: 80px; }
             .menu-toggle { display: flex !important; }
         }
 
-        /* --- Graphics & Cards --- */
+        /* --- Stat Cards --- */
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
         .stat-card { background: white; padding: 18px; border-radius: 1.2rem; border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 12px; }
         
@@ -64,15 +77,15 @@
         .btn-green { background: var(--ttu-success); color: white; }
         .btn-red { background: #f1f5f9; color: #ef4444; font-size: 13px; margin-top: 25px; }
 
-        /* --- Table Styling --- */
-        .table-container { background: white; border-radius: 1.2rem; overflow-x: auto; border: 1px solid #e2e8f0; }
+        /* --- Table Fixes --- */
+        .table-container { background: white; border-radius: 1.2rem; overflow-x: auto; border: 1px solid #e2e8f0; -webkit-overflow-scrolling: touch; }
         table { width: 100%; border-collapse: collapse; min-width: 450px; }
         th { background: #f8fafc; padding: 15px; text-align: left; font-size: 11px; color: #64748b; text-transform: uppercase; }
         td { padding: 15px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
 
-        /* --- Mobile Toggle --- */
+        /* --- Floating Menu Toggle --- */
         .menu-toggle { display: none; position: fixed; bottom: 25px; right: 25px; background: var(--ttu-blue); color: white; border: none; width: 60px; height: 60px; border-radius: 50%; align-items: center; justify-content: center; z-index: 5000; box-shadow: 0 10px 25px rgba(0,64,133,0.3); }
-        .sidebar-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.4); z-index: 3500; backdrop-filter: blur(3px); }
+        .sidebar-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.4); z-index: 3500; backdrop-filter: blur(3px); touch-action: none; }
         .sidebar-overlay.active { display: block; }
 
         .pulse-dot { width: 8px; height: 8px; background: var(--ttu-success); border-radius: 50%; display: inline-block; animation: pulse 2s infinite; }
@@ -89,7 +102,7 @@
         <div class="login-card">
             <div style="font-size: 40px; margin-bottom: 10px;">🏛️</div>
             <h2 style="color: var(--ttu-blue); margin:0;">TTU Admin</h2>
-            <p style="color: #64748b; font-size: 14px; margin-bottom: 25px;">Faculty Management Login</p>
+            <p style="color: #64748b; font-size: 14px; margin-bottom: 25px;">Faculty Management Portal</p>
             <input type="password" id="adminPass" placeholder="System Password">
             <button class="btn btn-blue" onclick="verifyAdmin()">Enter Portal</button>
         </div>
@@ -100,18 +113,18 @@
         <button class="menu-toggle" id="mBtn" onclick="toggleSidebar()"><i data-lucide="menu"></i></button>
 
         <div class="sidebar" id="sidebar">
-            <h3 style="color: var(--ttu-blue); margin:0 0 20px 0; display: flex; align-items: center; gap: 8px;"><i data-lucide="shield-check"></i> Admin Panel</h3>
+            <h3 style="color: var(--ttu-blue); margin:0 0 20px 0; display: flex; align-items: center; gap: 8px;"><i data-lucide="shield-check"></i> Faculty Portal</h3>
             
-            <label>Level & Dept</label>
+            <label>Context Selection</label>
             <select id="levelInput" onchange="contextChanged()"><option>100</option><option>200</option><option selected>300</option><option>400</option></select>
             <select id="deptInput" onchange="contextChanged()"><option>Mechanical</option><option>Electrical</option><option>Civil</option><option>Petroleum</option></select>
 
-            <hr style="margin:15px 0; border: 0; border-top: 1px solid #f1f5f9;">
+            <hr style="margin:20px 0; border: 0; border-top: 1px solid #f1f5f9;">
             
-            <label>Course History</label>
+            <label>Load from History</label>
             <select id="courseHistorySelector" onchange="loadCourseFromHistory()"></select>
             
-            <label>Section</label>
+            <label>Current Section</label>
             <select id="sectionInput" onchange="autoLoadLecturer(); refresh();"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option></select>
 
             <label>Course Name</label>
@@ -120,24 +133,24 @@
             <label>Lecturer Name</label>
             <input type="text" id="lecturerNameInput" placeholder="Lecturer Name">
 
-            <label>Current Date View</label>
+            <label>Attendance Date</label>
             <input type="date" id="dateFilter" onchange="switchMode('daily')">
             
-            <button class="btn btn-blue" id="gpsBtn" onclick="updateRoomGPS()"><i data-lucide="map-pin"></i> Sync GPS</button>
+            <button class="btn btn-blue" id="gpsBtn" onclick="updateRoomGPS()"><i data-lucide="map-pin"></i> Sync Room GPS</button>
             
             <hr style="margin:20px 0; border: 0; border-top: 1px solid #f1f5f9;">
             
             <label>Reporting Tools</label>
-            <button class="btn btn-gold" onclick="switchMode('semester')"><i data-lucide="layers"></i> Semester Summary</button>
+            <button class="btn btn-gold" onclick="switchMode('semester')"><i data-lucide="layers"></i> Compile Semester</button>
             <button class="btn btn-green" onclick="downloadCSV()"><i data-lucide="file-text"></i> Export Current View</button>
-            <button class="btn btn-red" onclick="location.reload()">🔒 Logout</button>
+            <button class="btn btn-red" onclick="location.reload()">🔒 Secure Logout</button>
         </div>
 
         <div class="content">
             <div class="stats-grid">
                 <div class="stat-card">
                     <div style="background: #e0f2fe; color: #0369a1; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;"><i data-lucide="users" size="20"></i></div>
-                    <div><label style="margin:0" id="countLabel">Daily Total</label><div style="font-size: 22px; font-weight: 800;" id="count">0</div></div>
+                    <div><label style="margin:0" id="countLabel">Present Today</label><div style="font-size: 22px; font-weight: 800;" id="count">0</div></div>
                 </div>
                 <div class="stat-card">
                     <div style="background: #dcfce7; color: #15803d; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;"><i data-lucide="bar-chart" size="20"></i></div>
@@ -146,7 +159,7 @@
             </div>
 
             <h2 id="mainTitle" style="margin:0 0 5px; color: var(--ttu-blue); font-size: 22px;">Attendance Log</h2>
-            <p id="subTitle" style="color:#64748b; margin-bottom: 20px; font-size: 13px;"></p>
+            <p id="subTitle" style="color:#64748b; margin-bottom: 25px; font-size: 13px;"></p>
             
             <div class="table-container">
                 <table id="attendanceTable">
@@ -162,12 +175,16 @@
         const supabase = createClient('https://tnscsgqogoqrwdohytki.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc2NzZ3FvZ29xcndkb2h5dGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MTcwMjQsImV4cCI6MjA5NTE5MzAyNH0.Xy-QKWBrYXIMP7M_lBmW4SnUxlBpnbm_Poatd8W5Ph4');
 
         let allSavedClasses = [];
-        let currentMode = 'daily'; // 'daily' or 'semester'
+        let currentMode = 'daily';
         
         window.toggleSidebar = () => {
             const isAct = document.getElementById('sidebar').classList.toggle('active');
             document.getElementById('overlay').classList.toggle('active');
-            document.body.classList.toggle('menu-open');
+            
+            // LOCK BODY SCROLL
+            if (isAct) document.body.classList.add('menu-open');
+            else document.body.classList.remove('menu-open');
+
             document.getElementById('mBtn').innerHTML = isAct ? '<i data-lucide="x"></i>' : '<i data-lucide="menu"></i>';
             lucide.createIcons();
         };
@@ -177,10 +194,11 @@
                 document.getElementById('loginScreen').style.display = "none";
                 document.getElementById('adminWrapper').style.display = "block";
                 loadAllClassesFromDB(); refresh(); lucide.createIcons();
-            } else alert("Denied");
+            } else alert("Access Denied");
         };
 
         document.getElementById('dateFilter').value = new Date().toISOString().split('T')[0];
+        
         window.contextChanged = () => { 
             document.getElementById('classNameInput').value = ""; 
             document.getElementById('lecturerNameInput').value = ""; 
@@ -198,7 +216,7 @@
             const matches = allSavedClasses.filter(c => c.level === level && c.department === dept);
             const uniqueNames = [...new Set(matches.map(c => c.name))];
             const sel = document.getElementById('courseHistorySelector');
-            sel.innerHTML = uniqueNames.length > 0 ? '<option value="">-- Select Course --</option>' : '<option value="">-- No matches --</option>';
+            sel.innerHTML = uniqueNames.length > 0 ? '<option value="">-- Choose Course --</option>' : '<option value="">-- Empty --</option>';
             uniqueNames.forEach(n => { const o = document.createElement('option'); o.value = n; o.innerText = n; sel.appendChild(o); });
         };
 
@@ -220,15 +238,13 @@
             currentMode = mode;
             const display = document.getElementById('modeDisplay');
             if (mode === 'daily') {
-                display.innerText = "Daily";
-                display.className = "mode-badge mode-daily";
-                document.getElementById('countLabel').innerText = "Daily Total";
+                display.innerText = "Daily"; display.className = "mode-badge mode-daily";
+                document.getElementById('countLabel').innerText = "Present Today";
                 document.getElementById('tableHeader').innerHTML = "<th>Time</th><th>Student Name</th><th>Index</th><th>Status</th>";
             } else {
-                display.innerText = "Semester";
-                display.className = "mode-badge mode-semester";
-                document.getElementById('countLabel').innerText = "Unique Students";
-                document.getElementById('tableHeader').innerHTML = "<th>Rank</th><th>Student Name</th><th>Index No.</th><th>Total Presence</th>";
+                display.innerText = "Semester"; display.className = "mode-badge mode-semester";
+                document.getElementById('countLabel').innerText = "Total Unique";
+                document.getElementById('tableHeader').innerHTML = "<th>Rank</th><th>Student Name</th><th>Index No.</th><th>Presence Count</th>";
             }
             if(window.innerWidth < 1024 && mode === 'semester') toggleSidebar();
             refresh();
@@ -243,28 +259,17 @@
                 const st = `${dt}T00:00:00.000Z`, en = `${dt}T23:59:59.999Z`;
                 const { data } = await supabase.from('attendance').select('*').eq('class_id', cid).gte('created_at', st).lte('created_at', en).order('created_at', {ascending: false});
                 document.getElementById('count').innerText = data ? data.length : 0;
-                document.getElementById('list').innerHTML = data?.map(x => `<tr><td style="color:#64748b; font-size:12px;">${new Date(x.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td><td><b>${x.student}</b></td><td><code>${x.index_number}</code></td><td><span class="verified-badge"><i data-lucide="check" size="10"></i> VERIFIED</span></td></tr>`).join('') || "<tr><td colspan='4' style='text-align:center; padding:40px;'>No daily records.</td></tr>";
+                document.getElementById('list').innerHTML = data?.map(x => `<tr><td style="color:#64748b; font-size:12px;">${new Date(x.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td><td><b>${x.student}</b></td><td><code style="background:#f1f5f9; padding:4px 8px; border-radius:6px;">${x.index_number}</code></td><td><span class="verified-badge"><i data-lucide="check" size="10"></i> VERIFIED</span></td></tr>`).join('') || "<tr><td colspan='4' style='text-align:center; padding:40px;'>No records found for today.</td></tr>";
             } else {
-                // SEMESTER COMPILATION LOGIC
                 const { data } = await supabase.from('attendance').select('student, index_number').eq('class_id', cid);
-                
-                // Group by Index Number
                 const summary = {};
                 data?.forEach(row => {
                     if (!summary[row.index_number]) summary[row.index_number] = { name: row.student, count: 0 };
                     summary[row.index_number].count++;
                 });
-
                 const sorted = Object.entries(summary).sort((a, b) => b[1].count - a[1].count);
                 document.getElementById('count').innerText = sorted.length;
-                document.getElementById('list').innerHTML = sorted.map(([index, info], i) => `
-                    <tr>
-                        <td>#${i+1}</td>
-                        <td><b>${info.name}</b></td>
-                        <td><code>${index}</code></td>
-                        <td><span style="font-weight:bold; color:var(--ttu-blue)">${info.count} Weeks</span></td>
-                    </tr>
-                `).join('') || "<tr><td colspan='4' style='text-align:center; padding:40px;'>No data for compilation.</td></tr>";
+                document.getElementById('list').innerHTML = sorted.map(([index, info], i) => `<tr><td>#${i+1}</td><td><b>${info.name}</b></td><td><code>${index}</code></td><td><span style="font-weight:bold; color:var(--ttu-blue)">${info.count} Times</span></td></tr>`).join('') || "<tr><td colspan='4' style='text-align:center; padding:40px;'>No data to compile.</td></tr>";
             }
             
             document.getElementById('mainTitle').innerText = c;
@@ -274,36 +279,31 @@
 
         window.updateRoomGPS = () => {
             const l = document.getElementById('levelInput').value, d = document.getElementById('deptInput').value, c = document.getElementById('classNameInput').value, s = document.getElementById('sectionInput').value, lec = document.getElementById('lecturerNameInput').value;
-            if(!c || !lec) return alert("Missing Details");
+            if(!c || !lec) return alert("Fill course and lecturer details!");
             const cid = `${d}_${l}_${c.replace(/\s+/g, '_')}_${s}`.toLowerCase();
-            const btn = document.getElementById('gpsBtn'); btn.innerHTML = "⏳ Syncing..."; btn.disabled = true;
+            const btn = document.getElementById('gpsBtn'); btn.innerHTML = "⏳ Syncing GPS..."; btn.disabled = true;
             navigator.geolocation.getCurrentPosition(async (p) => {
                 await supabase.from('classes').upsert({ id: cid, name: c, department: d, level: l, section: s, lecturer_name: lec, lat: p.coords.latitude, lng: p.coords.longitude });
-                alert("GPS Synchronized!"); if(window.innerWidth < 1024) toggleSidebar(); loadAllClassesFromDB(); refresh(); btn.innerHTML = '<i data-lucide="map-pin"></i> Sync GPS'; btn.disabled = false;
+                alert("GPS Sync Successful!"); if(window.innerWidth < 1024) toggleSidebar(); loadAllClassesFromDB(); refresh(); btn.innerHTML = '<i data-lucide="map-pin"></i> Sync Room GPS'; btn.disabled = false;
                 lucide.createIcons();
-            }, (e) => { alert("GPS Lock Failed"); btn.disabled = false; }, {enableHighAccuracy:true});
+            }, (e) => { alert("GPS Lock Failed."); btn.disabled = false; }, {enableHighAccuracy:true});
         };
 
         window.downloadCSV = () => {
             const c = document.getElementById('classNameInput').value || "Report";
-            let csv = currentMode === 'semester' ? "Index Number,Student Name,Total Attendance\n" : "Time,Name,Index\n";
+            let csv = currentMode === 'semester' ? "Index,Name,Total_Attendance\n" : "Time,Name,Index\n";
             document.querySelectorAll("#list tr").forEach(tr => { 
                 if (tr.cells.length > 1) {
-                    if (currentMode === 'semester') {
-                        csv += `${tr.cells[2].innerText},${tr.cells[1].innerText.replace(',','')},${tr.cells[3].innerText.split(' ')[0]}\n`;
-                    } else {
-                        csv += `${tr.cells[0].innerText},${tr.cells[1].innerText.replace(',','')},${tr.cells[2].innerText}\n`;
-                    }
+                    if (currentMode === 'semester') csv += `${tr.cells[2].innerText},${tr.cells[1].innerText.replace(',','')},${tr.cells[3].innerText.split(' ')[0]}\n`;
+                    else csv += `${tr.cells[0].innerText},${tr.cells[1].innerText.replace(',','')},${tr.cells[2].innerText}\n`;
                 }
             });
             const b = new Blob([csv], { type: 'text/csv' });
             const ln = document.createElement("a"); ln.href = URL.createObjectURL(b); 
-            ln.download = `${c}_${currentMode}_Summary.csv`; ln.click();
+            ln.download = `${c}_Summary.csv`; ln.click();
         };
 
-        supabase.channel('db').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attendance' }, () => {
-            if(currentMode === 'daily') refresh();
-        }).subscribe();
+        supabase.channel('db').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attendance' }, () => { if(currentMode === 'daily') refresh(); }).subscribe();
     </script>
 </body>
 </html>
