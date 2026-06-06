@@ -28,8 +28,7 @@
 
     <div id="loginScreen" class="login-screen">
         <div class="login-card">
-            <h2 style="color:#004085; margin:0;">TTU Engineering</h2>
-            <p style="font-size: 12px; color: #64748b; margin-bottom: 20px;">Faculty Management Portal</p>
+            <h2 style="color:#004085; margin:0;">TTU Admin</h2>
             <input type="password" id="adminPass" placeholder="System Password">
             <button class="btn btn-blue" onclick="verifyAdmin()">Login</button>
         </div>
@@ -37,46 +36,45 @@
 
     <div id="adminWrapper">
         <button class="menu-toggle" id="mBtn" onclick="toggleSidebar()">☰</button>
-
         <div class="sidebar" id="sidebar">
             <h3 style="color:#004085; margin:0;">Faculty Portal</h3>
             
             <label>Level</label>
-            <select id="levelInput" onchange="updateHistoryList(); refresh();">
+            <select id="levelInput" onchange="contextChanged()">
                 <option value="100">Level 100</option>
                 <option value="200">Level 200</option>
-                <option value="300">Level 300</option>
+                <option value="300" selected>Level 300</option>
                 <option value="400">Level 400</option>
             </select>
 
             <label>Department</label>
-            <select id="deptInput" onchange="updateHistoryList(); refresh();">
+            <select id="deptInput" onchange="contextChanged()">
                 <option value="Mechanical">Mechanical</option>
                 <option value="Electrical">Electrical</option>
                 <option value="Civil">Civil</option>
                 <option value="Petroleum">Petroleum</option>
             </select>
 
-            <hr style="margin:15px 0; border:0; border-top:1px solid #f1f5f9;">
-
-            <label>Select Course</label>
-            <select id="courseHistorySelector" onchange="loadCourseFromHistory()">
-                <option value="">-- No history --</option>
-            </select>
-            
             <label>Section (Class)</label>
-            <select id="sectionInput" onchange="autoLoadLecturer(); refresh();">
+            <select id="sectionInput" onchange="contextChanged()">
                 <option value="A">Class A</option><option value="B">Class B</option><option value="C">Class C</option>
                 <option value="D">Class D</option><option value="E">Class E</option><option value="F">Class F</option>
             </select>
 
+            <hr style="margin:15px 0; border:0; border-top:1px solid #f1f5f9;">
+
+            <label>Load Course From History</label>
+            <select id="courseHistorySelector" onchange="loadCourseFromHistory()">
+                <option value="">-- No records --</option>
+            </select>
+            
             <label>Course Name</label>
-            <input type="text" id="classNameInput" placeholder="eg. Thermodynamics" oninput="refresh()">
+            <input type="text" id="classNameInput" placeholder="Enter Course Name" oninput="refresh()">
 
             <label>Lecturer Name</label>
             <input type="text" id="lecturerNameInput" placeholder="Enter Lecturer Name">
 
-            <label>Records for Date</label>
+            <label>Attendance Date</label>
             <input type="date" id="dateFilter" onchange="refresh()">
             
             <img id="qrImage">
@@ -106,7 +104,6 @@
 
         window.toggleSidebar = () => {
             const isActive = document.getElementById('sidebar').classList.toggle('active');
-            document.getElementById('overlay')?.classList.toggle('active');
             document.getElementById('mBtn').innerText = isActive ? '✕' : '☰';
         };
 
@@ -120,6 +117,24 @@
 
         document.getElementById('dateFilter').value = new Date().toISOString().split('T')[0];
 
+        // --- CORE FUNCTION: Reset everything when context changes ---
+        window.contextChanged = () => {
+            // 1. Clear text inputs
+            document.getElementById('classNameInput').value = "";
+            document.getElementById('lecturerNameInput').value = "";
+            
+            // 2. Clear student list and title
+            document.getElementById('list').innerHTML = "<tr><td colspan='4' style='text-align:center; padding:30px; color:#94a3b8;'>Form cleared. Select a course or type a new name.</td></tr>";
+            document.getElementById('mainTitle').innerText = "Attendance Log";
+            document.getElementById('subTitle').innerText = "Context Changed - Ready for new input";
+            
+            // 3. Update the history dropdown to match new level/dept
+            updateHistoryList();
+            
+            // 4. Update QR (will point to a blank ID for now)
+            refresh();
+        };
+
         async function loadAllClassesFromDB() {
             const { data } = await supabase.from('classes').select('*').order('name');
             if (data) {
@@ -129,21 +144,17 @@
         }
 
         window.updateHistoryList = () => {
-            const currentLevel = document.getElementById('levelInput').value;
-            const currentDept = document.getElementById('deptInput').value;
+            const level = document.getElementById('levelInput').value;
+            const dept = document.getElementById('deptInput').value;
             const selector = document.getElementById('courseHistorySelector');
             
-            const matches = allSavedClasses.filter(c => c.level === currentLevel && c.department === currentDept);
+            const matches = allSavedClasses.filter(c => c.level === level && c.department === dept);
             const uniqueNames = [...new Set(matches.map(c => c.name))];
 
-            selector.innerHTML = uniqueNames.length > 0 
-                ? '<option value="">-- Choose Course --</option>' 
-                : '<option value="">-- No records found --</option>';
-            
+            selector.innerHTML = uniqueNames.length > 0 ? '<option value="">-- Choose Course --</option>' : '<option value="">-- No history --</option>';
             uniqueNames.forEach(name => {
                 const opt = document.createElement('option');
-                opt.value = name; opt.innerText = name;
-                selector.appendChild(opt);
+                opt.value = name; opt.innerText = name; selector.appendChild(opt);
             });
         };
 
@@ -152,31 +163,20 @@
             if (!selectedName) return;
 
             document.getElementById('classNameInput').value = selectedName;
-            autoLoadLecturer(); // Load lecturer based on course name + currently selected section
-        };
-
-        // --- NEW: Smart Lecturer Auto-Loading ---
-        window.autoLoadLecturer = () => {
-            const courseName = document.getElementById('classNameInput').value;
-            const section = document.getElementById('sectionInput').value;
+            
+            // Find the lecturer for this exact Level/Dept/Section/Course
             const level = document.getElementById('levelInput').value;
             const dept = document.getElementById('deptInput').value;
+            const section = document.getElementById('sectionInput').value;
 
-            // Find the specific lecturer that matches this exact course and section combo
             const match = allSavedClasses.find(c => 
-                c.name === courseName && 
+                c.name === selectedName && 
                 c.section === section && 
                 c.level === level && 
                 c.department === dept
             );
 
-            if (match) {
-                document.getElementById('lecturerNameInput').value = match.lecturer_name;
-            } else {
-                // If no record for this section yet, try to find ANY lecturer for this course name as a hint
-                const anyMatch = allSavedClasses.find(c => c.name === courseName);
-                document.getElementById('lecturerNameInput').value = anyMatch ? anyMatch.lecturer_name : "";
-            }
+            document.getElementById('lecturerNameInput').value = match ? match.lecturer_name : "";
             refresh();
         };
 
@@ -191,14 +191,18 @@
             const studentUrl = `https://ttu-attendance-portal.github.io/attendance-system/?class=${cid}`;
             document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(studentUrl)}`;
             
+            // Only fetch if a course name exists
+            if (!course) return;
+
             const start = `${date}T00:00:00.000Z`, end = `${date}T23:59:59.999Z`;
             const { data } = await supabase.from('attendance').select('*').eq('class_id', cid).gte('created_at', start).lte('created_at', end).order('created_at', {ascending: false});
             
-            document.getElementById('mainTitle').innerText = course || "Attendance Log";
-            document.getElementById('subTitle').innerText = `${dept} L${level} | Section ${sec} | ${data?.length || 0} Present`;
+            const currentLecturer = document.getElementById('lecturerNameInput').value || "No Lecturer Set";
+            document.getElementById('mainTitle').innerText = course;
+            document.getElementById('subTitle').innerText = `${dept} L${level} | Sec ${sec} | ${currentLecturer}`;
 
             if (data) {
-                document.getElementById('list').innerHTML = data.map(d => `<tr><td>${new Date(d.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td><td><b>${d.student}</b></td><td>${d.index_number}</td><td><span style="color:green">● Verified</span></td></tr>`).join('') || "<tr><td colspan='4' style='text-align:center; padding:30px; color:#94a3b8;'>No records.</td></tr>";
+                document.getElementById('list').innerHTML = data.map(d => `<tr><td>${new Date(d.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td><td><b>${d.student}</b></td><td>${d.index_number}</td><td><span style="color:green">● Verified</span></td></tr>`).join('') || "<tr><td colspan='4' style='text-align:center; padding:30px; color:#94a3b8;'>No records for this date.</td></tr>";
             }
         };
 
@@ -221,7 +225,7 @@
                     id: cid, name: course, department: dept, level: level, section: sec, lecturer_name: lecturer, 
                     lat: pos.coords.latitude, lng: pos.coords.longitude 
                 });
-                alert("✅ Success! Session is live."); 
+                alert(`✅ Success! L${level} ${course} (Sec ${sec}) is now active.`); 
                 if(window.innerWidth < 768) toggleSidebar();
                 loadAllClassesFromDB(); refresh();
                 btn.innerText = "📍 Sync GPS & Set Live"; btn.disabled = false;
@@ -229,7 +233,7 @@
         };
 
         window.downloadCSV = () => {
-            const course = document.getElementById('classNameInput').value;
+            const course = document.getElementById('classNameInput').value || "Attendance";
             const level = document.getElementById('levelInput').value;
             const sec = document.getElementById('sectionInput').value;
             let csv = "Time,Name,Index\n";
