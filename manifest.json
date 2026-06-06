@@ -1,0 +1,21 @@
+{
+  "name": "TTU Attendance Portal",
+  "short_name": "TTU Admin",
+  "description": "Professional Faculty Attendance System",
+  "start_url": "teacher.html",
+  "display": "standalone",
+  "background_color": "#004085",
+  "theme_color": "#004085",
+  "icons": [
+    {
+      "src": "https://api.qrserver.com/v1/create-qr-code/?size=192x192&data=TTU",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://api.qrserver.com/v1/create-qr-code/?size=512x512&data=TTU",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
