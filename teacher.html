@@ -29,6 +29,7 @@
     <div id="loginScreen" class="login-screen">
         <div class="login-card">
             <h2 style="color:#004085; margin:0;">TTU Admin</h2>
+            <p style="font-size: 12px; color: #64748b; margin-bottom: 20px;">Faculty Management Portal</p>
             <input type="password" id="adminPass" placeholder="System Password">
             <button class="btn btn-blue" onclick="verifyAdmin()">Login</button>
         </div>
@@ -56,14 +57,14 @@
             </select>
 
             <label>Section (Class)</label>
-            <select id="sectionInput" onchange="contextChanged()">
+            <select id="sectionInput" onchange="autoLoadLecturer(); refresh();">
                 <option value="A">Class A</option><option value="B">Class B</option><option value="C">Class C</option>
                 <option value="D">Class D</option><option value="E">Class E</option><option value="F">Class F</option>
             </select>
 
             <hr style="margin:15px 0; border:0; border-top:1px solid #f1f5f9;">
 
-            <label>Load Course From History</label>
+            <label>Course History</label>
             <select id="courseHistorySelector" onchange="loadCourseFromHistory()">
                 <option value="">-- No records --</option>
             </select>
@@ -74,7 +75,7 @@
             <label>Lecturer Name</label>
             <input type="text" id="lecturerNameInput" placeholder="Enter Lecturer Name">
 
-            <label>Attendance Date</label>
+            <label>Date</label>
             <input type="date" id="dateFilter" onchange="refresh()">
             
             <img id="qrImage">
@@ -117,21 +118,10 @@
 
         document.getElementById('dateFilter').value = new Date().toISOString().split('T')[0];
 
-        // --- CORE FUNCTION: Reset everything when context changes ---
         window.contextChanged = () => {
-            // 1. Clear text inputs
             document.getElementById('classNameInput').value = "";
             document.getElementById('lecturerNameInput').value = "";
-            
-            // 2. Clear student list and title
-            document.getElementById('list').innerHTML = "<tr><td colspan='4' style='text-align:center; padding:30px; color:#94a3b8;'>Form cleared. Select a course or type a new name.</td></tr>";
-            document.getElementById('mainTitle').innerText = "Attendance Log";
-            document.getElementById('subTitle').innerText = "Context Changed - Ready for new input";
-            
-            // 3. Update the history dropdown to match new level/dept
             updateHistoryList();
-            
-            // 4. Update QR (will point to a blank ID for now)
             refresh();
         };
 
@@ -151,7 +141,7 @@
             const matches = allSavedClasses.filter(c => c.level === level && c.department === dept);
             const uniqueNames = [...new Set(matches.map(c => c.name))];
 
-            selector.innerHTML = uniqueNames.length > 0 ? '<option value="">-- Choose Course --</option>' : '<option value="">-- No history --</option>';
+            selector.innerHTML = uniqueNames.length > 0 ? '<option value="">-- Choose Course --</option>' : '<option value="">-- No records --</option>';
             uniqueNames.forEach(name => {
                 const opt = document.createElement('option');
                 opt.value = name; opt.innerText = name; selector.appendChild(opt);
@@ -161,22 +151,34 @@
         window.loadCourseFromHistory = () => {
             const selectedName = document.getElementById('courseHistorySelector').value;
             if (!selectedName) return;
-
             document.getElementById('classNameInput').value = selectedName;
-            
-            // Find the lecturer for this exact Level/Dept/Section/Course
+            autoLoadLecturer(); 
+        };
+
+        // --- IMPROVED: SMART SUGGESTIVE LECTURER LOADING ---
+        window.autoLoadLecturer = () => {
+            const courseName = document.getElementById('classNameInput').value;
+            const section = document.getElementById('sectionInput').value;
             const level = document.getElementById('levelInput').value;
             const dept = document.getElementById('deptInput').value;
-            const section = document.getElementById('sectionInput').value;
 
-            const match = allSavedClasses.find(c => 
-                c.name === selectedName && 
-                c.section === section && 
-                c.level === level && 
-                c.department === dept
+            if (!courseName) return;
+
+            // 1. Check for exact match (Section + Course)
+            const exactMatch = allSavedClasses.find(c => 
+                c.name === courseName && c.section === section && c.level === level && c.department === dept
             );
 
-            document.getElementById('lecturerNameInput').value = match ? match.lecturer_name : "";
+            if (exactMatch) {
+                document.getElementById('lecturerNameInput').value = exactMatch.lecturer_name;
+            } else {
+                // 2. Suggestion: Find ANY other section of this course at this level/dept
+                const genericMatch = allSavedClasses.find(c => 
+                    c.name === courseName && c.level === level && c.department === dept
+                );
+                // Fill the box with the "suggested" name to save the user typing time
+                document.getElementById('lecturerNameInput').value = genericMatch ? genericMatch.lecturer_name : ""; 
+            }
             refresh();
         };
 
@@ -191,18 +193,16 @@
             const studentUrl = `https://ttu-attendance-portal.github.io/attendance-system/?class=${cid}`;
             document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(studentUrl)}`;
             
-            // Only fetch if a course name exists
             if (!course) return;
 
             const start = `${date}T00:00:00.000Z`, end = `${date}T23:59:59.999Z`;
             const { data } = await supabase.from('attendance').select('*').eq('class_id', cid).gte('created_at', start).lte('created_at', end).order('created_at', {ascending: false});
             
-            const currentLecturer = document.getElementById('lecturerNameInput').value || "No Lecturer Set";
             document.getElementById('mainTitle').innerText = course;
-            document.getElementById('subTitle').innerText = `${dept} L${level} | Sec ${sec} | ${currentLecturer}`;
+            document.getElementById('subTitle').innerText = `${dept} L${level} | Sec ${sec} | ${document.getElementById('lecturerNameInput').value || '---'}`;
 
             if (data) {
-                document.getElementById('list').innerHTML = data.map(d => `<tr><td>${new Date(d.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td><td><b>${d.student}</b></td><td>${d.index_number}</td><td><span style="color:green">● Verified</span></td></tr>`).join('') || "<tr><td colspan='4' style='text-align:center; padding:30px; color:#94a3b8;'>No records for this date.</td></tr>";
+                document.getElementById('list').innerHTML = data.map(d => `<tr><td>${new Date(d.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td><td><b>${d.student}</b></td><td>${d.index_number}</td><td><span style="color:green">● Verified</span></td></tr>`).join('') || "<tr><td colspan='4' style='text-align:center; padding:30px; color:#94a3b8;'>No records.</td></tr>";
             }
         };
 
@@ -225,7 +225,7 @@
                     id: cid, name: course, department: dept, level: level, section: sec, lecturer_name: lecturer, 
                     lat: pos.coords.latitude, lng: pos.coords.longitude 
                 });
-                alert(`✅ Success! L${level} ${course} (Sec ${sec}) is now active.`); 
+                alert(`✅ Class ${sec} Activated!`); 
                 if(window.innerWidth < 768) toggleSidebar();
                 loadAllClassesFromDB(); refresh();
                 btn.innerText = "📍 Sync GPS & Set Live"; btn.disabled = false;
@@ -233,7 +233,7 @@
         };
 
         window.downloadCSV = () => {
-            const course = document.getElementById('classNameInput').value || "Attendance";
+            const course = document.getElementById('classNameInput').value || "Report";
             const level = document.getElementById('levelInput').value;
             const sec = document.getElementById('sectionInput').value;
             let csv = "Time,Name,Index\n";
